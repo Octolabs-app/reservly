@@ -52,6 +52,15 @@ export function getMauritiusDayOfWeek(date: string) {
   return new Date(`${date}T12:00:00${MAURITIUS_OFFSET}`).getUTCDay();
 }
 
+export function mauritiusDateFromIso(iso: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Indian/Mauritius",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
 export function getBookingMonthKey(iso: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Indian/Mauritius",
@@ -92,6 +101,7 @@ export function generateSlots({
   bookings,
   monthlyFull,
   stepMinutes = 30,
+  minNoticeMinutes = 0,
 }: {
   date: string;
   service: Service;
@@ -99,6 +109,7 @@ export function generateSlots({
   bookings: Booking[];
   monthlyFull: boolean;
   stepMinutes?: number;
+  minNoticeMinutes?: number;
 }): Slot[] {
   const dayOfWeek = getMauritiusDayOfWeek(date);
   const day = availability.find((entry) => entry.dayOfWeek === dayOfWeek);
@@ -106,16 +117,11 @@ export function generateSlots({
 
   const open = minutesFromTime(day.opensAt);
   const close = minutesFromTime(day.closesAt);
-  const latestStart = close - service.durationMinutes;
   const now = Date.now();
-  const slots: Slot[] = [];
+  const minNoticeMs = Math.max(0, minNoticeMinutes) * 60_000;
 
-  for (let minute = open; minute <= latestStart; minute += stepMinutes) {
-    const time = timeFromMinutes(minute);
-    const startAt = isoFromMauritiusLocal(date, time);
-    const startMs = new Date(startAt).getTime();
-    const endMs = startMs + service.durationMinutes * 60_000;
-    const overlaps = bookings.some((booking) => {
+  function overlapsBooking(startMs: number, endMs: number) {
+    return bookings.some((booking) => {
       if (booking.status === "cancelled") return false;
       const bookingStart = new Date(booking.startAt).getTime();
       const bookingEnd = new Date(booking.endAt).getTime();
@@ -123,9 +129,34 @@ export function generateSlots({
         booking.businessId === service.businessId && startMs < bookingEnd && endMs > bookingStart
       );
     });
+  }
 
-    const past = startMs <= now;
-    const reason = monthlyFull ? "full" : past ? "past" : overlaps ? "taken" : undefined;
+  function slotReason(startMs: number, endMs: number): Slot["reason"] {
+    if (monthlyFull) return "full";
+    if (startMs <= now) return "past";
+    if (startMs - now < minNoticeMs) return "notice";
+    if (overlapsBooking(startMs, endMs)) return "taken";
+    return undefined;
+  }
+
+  // All-day services offer a single slot that spans the whole working day.
+  if (service.allDay) {
+    const startAt = isoFromMauritiusLocal(date, day.opensAt);
+    const startMs = new Date(startAt).getTime();
+    const endMs = new Date(isoFromMauritiusLocal(date, day.closesAt)).getTime();
+    const reason = slotReason(startMs, endMs);
+    return [{ time: "All day", startAt, available: !reason, reason }];
+  }
+
+  const latestStart = close - service.durationMinutes;
+  const slots: Slot[] = [];
+
+  for (let minute = open; minute <= latestStart; minute += stepMinutes) {
+    const time = timeFromMinutes(minute);
+    const startAt = isoFromMauritiusLocal(date, time);
+    const startMs = new Date(startAt).getTime();
+    const endMs = startMs + service.durationMinutes * 60_000;
+    const reason = slotReason(startMs, endMs);
     slots.push({
       time,
       startAt,

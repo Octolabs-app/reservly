@@ -77,19 +77,29 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Reservly — WhatsApp-native booking" },
-      { name: "description", content: "Your bookings, sorted. Built for island businesses." },
-      { property: "og:title", content: "Reservly" },
-      { property: "og:description", content: "WhatsApp-native booking for island businesses." },
+      { name: "theme-color", content: "#1B4FD8" },
+      { title: "Reservly — Your customers book. WhatsApp confirms." },
+      {
+        name: "description",
+        content:
+          "Booking links for island businesses. Customers tap, pick a slot, and get a WhatsApp confirmation — no app, no account.",
+      },
+      { property: "og:title", content: "Reservly — Your customers book. WhatsApp confirms." },
+      {
+        property: "og:description",
+        content: "Booking links for salons, barbers and small businesses. Free to start.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
     links: [
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "apple-touch-icon", href: "/logo-mark.svg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap",
       },
       {
         rel: "stylesheet",

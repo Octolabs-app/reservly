@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Kicker, Panel } from "@/components/reservly/AppShell";
+import { EmptyState, Panel, StatusPill } from "@/components/reservly/AppShell";
 import { cancelBooking, getDashboardData, markBookingConfirmed } from "@/lib/cf/client-data";
 import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
 import type { Booking, BookingStatus, DashboardData } from "@/lib/reservly/types";
@@ -9,13 +9,19 @@ export const Route = createFileRoute("/dashboard/bookings")({
   component: BookingsTab,
 });
 
-const FILTERS: Array<"all" | BookingStatus> = ["all", "confirmed", "pending", "cancelled"];
+const FILTERS: Array<{ id: "all" | BookingStatus; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "confirmed", label: "Confirmed" },
+  { id: "pending", label: "Pending" },
+  { id: "cancelled", label: "Cancelled" },
+];
 
 function BookingsTab() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [query, setQuery] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Booking | null>(null);
 
   async function refresh() {
     setData(await getDashboardData());
@@ -46,133 +52,161 @@ function BookingsTab() {
       await refresh();
     } finally {
       setBusyId(null);
+      setCancelTarget(null);
     }
   }
 
   if (!data) return <BookingsSkeleton />;
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <Kicker>Bookings</Kicker>
-          <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">All bookings</h1>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Bookings</h1>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            Confirm, cancel and search every booking.
+          </p>
         </div>
-        <div className="flex flex-col gap-3 sm:items-end">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search name, phone, service"
-            className="w-full border border-border-strong bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-accent focus:outline-none sm:w-72"
-          />
-          <div className="flex gap-1 border border-border-strong p-1">
-            {FILTERS.map((item) => (
-              <button
-                key={item}
-                onClick={() => setFilter(item)}
-                className={`px-3 py-1.5 font-display text-[10px] tracking-[0.25em] uppercase transition-colors ${
-                  filter === item
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search name, phone, service…"
+          className="input-field sm:w-72"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {FILTERS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setFilter(item.id)}
+            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              filter === item.id
+                ? "bg-primary text-white"
+                : "border border-border bg-white text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       <Panel className="overflow-hidden">
-        {rows.length === 0 && (
-          <div className="px-6 py-16 text-center font-display text-xs tracking-[0.25em] uppercase text-muted-foreground">
-            No bookings match
-          </div>
+        {rows.length === 0 ? (
+          <EmptyState
+            icon="📋"
+            title="No bookings match"
+            sub={
+              query || filter !== "all"
+                ? "Try a different search or filter."
+                : "Share your booking link to start taking bookings."
+            }
+          />
+        ) : (
+          rows.map((booking, index) => (
+            <div
+              key={booking.id}
+              className={`flex flex-col gap-2.5 px-4 py-3.5 transition-colors hover:bg-surface sm:flex-row sm:items-center ${
+                index < rows.length - 1 ? "border-b border-border/70" : ""
+              }`}
+            >
+              <div className="min-w-[88px] shrink-0">
+                <div className="text-[11px] text-muted-foreground">
+                  {formatDateLabel(booking.startAt)}
+                </div>
+                <div className="text-[13px] font-semibold text-foreground">
+                  {formatTimeLabel(booking.startAt)}
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13px] font-semibold text-foreground">
+                  {booking.customerName}
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {booking.customerPhone} · {booking.serviceName ?? "Service"}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <StatusPill status={booking.status} />
+                {booking.status === "pending" && (
+                  <button
+                    disabled={busyId === booking.id}
+                    onClick={() => void act(booking, "confirm")}
+                    className="rounded-lg border border-success/30 bg-success-soft px-2.5 py-1.5 text-xs font-medium text-success transition-colors hover:bg-success hover:text-white"
+                  >
+                    Confirm
+                  </button>
+                )}
+                {booking.status !== "cancelled" && (
+                  <button
+                    disabled={busyId === booking.id}
+                    onClick={() => setCancelTarget(booking)}
+                    className="rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
         )}
-        {rows.map((booking, index) => (
+      </Panel>
+
+      {/* Cancel confirmation dialog */}
+      {cancelTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setCancelTarget(null)}
+        >
           <div
-            key={booking.id}
-            className={`flex flex-col gap-4 px-5 py-4 transition-colors hover:bg-card sm:flex-row sm:items-center ${
-              index < rows.length - 1 ? "border-b border-border" : ""
-            }`}
+            className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl"
+            onClick={(event) => event.stopPropagation()}
           >
-            <div className="min-w-[120px]">
-              <div className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
-                {formatDateLabel(booking.startAt)}
-              </div>
-              <div className="mt-0.5 font-display text-base tracking-[0.05em] text-accent">
-                {formatTimeLabel(booking.startAt)}
-              </div>
-            </div>
-            <div className="flex-1">
-              <div className="font-display text-base tracking-[0.05em] text-foreground">
-                {booking.customerName}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {booking.customerPhone} - {booking.serviceName ?? "Service"}
-              </div>
-            </div>
-            <Status status={booking.status} />
-            <div className="flex gap-2">
-              {booking.status === "pending" && (
-                <button
-                  disabled={busyId === booking.id}
-                  onClick={() => void act(booking, "confirm")}
-                  className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground hover:text-success"
-                >
-                  Confirm
-                </button>
-              )}
-              {booking.status !== "cancelled" && (
-                <button
-                  disabled={busyId === booking.id}
-                  onClick={() => void act(booking, "cancel")}
-                  className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground hover:text-destructive"
-                >
-                  Cancel
-                </button>
-              )}
+            <div className="text-[15px] font-bold text-foreground">Cancel this booking?</div>
+            <p className="mt-1.5 text-[13px] text-muted-foreground">
+              {cancelTarget.customerName} will receive a WhatsApp cancellation message.
+            </p>
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button onClick={() => setCancelTarget(null)} className="btn-frame">
+                Keep it
+              </button>
+              <button
+                disabled={busyId === cancelTarget.id}
+                onClick={() => void act(cancelTarget, "cancel")}
+                className="rounded-[10px] border border-destructive/30 bg-destructive-soft px-3 py-2 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive hover:text-white"
+              >
+                {busyId === cancelTarget.id ? "Cancelling…" : "Cancel booking"}
+              </button>
             </div>
           </div>
-        ))}
-      </Panel>
+        </div>
+      )}
     </div>
   );
 }
 
 function BookingsSkeleton() {
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-4">
-          <div className="h-3 w-28 animate-pulse bg-muted" />
-          <div className="h-12 w-64 animate-pulse bg-muted" />
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <div className="skeleton h-7 w-40" />
+          <div className="skeleton h-4 w-60" />
         </div>
-        <div className="h-10 w-72 max-w-full animate-pulse border border-border-strong bg-muted/40" />
+        <div className="skeleton h-10 w-72 max-w-full rounded-[10px]" />
       </div>
-      <Panel className="p-5">
-        <div className="space-y-3">
-          {[0, 1, 2, 3].map((item) => (
-            <div key={item} className="h-16 animate-pulse border border-border bg-muted/40" />
-          ))}
-        </div>
-      </Panel>
+      <div className="flex gap-1.5">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="skeleton h-7 w-20 rounded-full" />
+        ))}
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-border bg-card">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="border-b border-border/60 px-4 py-3.5 last:border-0">
+            <div className="skeleton h-10 w-full" />
+          </div>
+        ))}
+      </div>
     </div>
-  );
-}
-
-function Status({ status }: { status: BookingStatus }) {
-  const cls =
-    status === "confirmed"
-      ? "border-success/40 bg-success-soft text-success"
-      : status === "pending"
-        ? "border-warning/40 bg-warning-soft text-warning"
-        : "border-destructive/40 bg-destructive/10 text-destructive";
-  return (
-    <span
-      className={`w-fit border px-2.5 py-1 font-display text-[10px] tracking-[0.25em] uppercase ${cls}`}
-    >
-      {status}
-    </span>
   );
 }

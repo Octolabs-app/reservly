@@ -15,9 +15,9 @@ function DashboardLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [owner, setOwner] = useState<Owner | null | undefined>(undefined);
   const tabs = [
-    { id: "home", label: "Today", to: "/dashboard" as const },
-    { id: "bookings", label: "Bookings", to: "/dashboard/bookings" as const },
-    { id: "settings", label: "Settings", to: "/dashboard/settings" as const },
+    { id: "home", label: "Home", icon: "🏠", to: "/dashboard" as const },
+    { id: "bookings", label: "Bookings", icon: "📋", to: "/dashboard/bookings" as const },
+    { id: "settings", label: "Settings", icon: "⚙️", to: "/dashboard/settings" as const },
   ];
 
   useEffect(() => {
@@ -33,16 +33,16 @@ function DashboardLayout() {
   }
 
   if (owner === undefined) {
-    return <div className="min-h-screen grid-bg-sm" />;
+    return <div className="min-h-screen bg-surface" />;
   }
 
   return (
-    <div className="min-h-screen grid-bg-sm">
-      <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <Brand size="sm" />
+    <div className="min-h-screen bg-surface">
+      <header className="sticky top-0 z-30 bg-ink">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4 sm:px-6">
+          <Brand size="sm" light />
 
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-0.5">
             {tabs.map((t) => {
               const active =
                 t.to === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(t.to);
@@ -50,38 +50,37 @@ function DashboardLayout() {
                 <Link
                   key={t.id}
                   to={t.to}
-                  className={`relative px-4 py-2 font-display text-[11px] tracking-[0.3em] uppercase transition-colors ${
-                    active ? "text-accent" : "text-muted-foreground hover:text-foreground"
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                    active
+                      ? "bg-white/12 font-medium text-white"
+                      : "text-white/45 hover:text-white/80"
                   }`}
                 >
-                  {t.label}
-                  {active && <span className="absolute -bottom-px left-2 right-2 h-px bg-accent" />}
+                  <span className="hidden sm:inline">{t.icon}</span>
+                  <span>{t.label}</span>
                 </Link>
               );
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
-            <Link
-              to="/"
-              className="hidden font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent sm:block"
-            >
-              View site
-            </Link>
+          <div className="flex items-center gap-2.5">
             <button
               onClick={signOut}
-              className="hidden font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent sm:block"
+              className="hidden text-xs text-white/45 transition-colors hover:text-white sm:block"
             >
               Sign out
             </button>
-            <div className="flex h-8 w-8 items-center justify-center border border-accent/40 font-display text-[11px] tracking-wider text-accent">
-              {initials(owner?.email ?? owner?.name ?? "RO")}
+            <div
+              title={owner?.email ?? "Account"}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white"
+            >
+              {initials(owner?.name ?? owner?.email ?? "RO")}
             </div>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-10">
+      <main className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-9">
         <Outlet />
       </main>
     </div>
@@ -91,5 +90,5 @@ function DashboardLayout() {
 function initials(value: string) {
   const clean = value.replace(/@.*/, "").replace(/[^a-zA-Z ]/g, " ");
   const parts = clean.trim().split(/\s+/).filter(Boolean);
-  return (parts[0]?.[0] ?? "R").concat(parts[1]?.[0] ?? "O").toUpperCase();
+  return (parts[0]?.[0] ?? "R").concat(parts[1]?.[0] ?? "").toUpperCase();
 }

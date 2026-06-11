@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Kicker, Panel } from "@/components/reservly/AppShell";
+import { Panel } from "@/components/reservly/AppShell";
 import {
   createService,
   deleteService,
@@ -26,6 +26,32 @@ export const Route = createFileRoute("/dashboard/settings")({
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const LANGS: BookingLanguage[] = ["English", "Francais", "Both"];
 
+const NOTICE_OPTIONS = [
+  { value: 0, label: "No minimum — book any time" },
+  { value: 60, label: "At least 1 hour before" },
+  { value: 120, label: "At least 2 hours before" },
+  { value: 240, label: "At least 4 hours before" },
+  { value: 720, label: "At least 12 hours before" },
+  { value: 1440, label: "At least 1 day before" },
+  { value: 2880, label: "At least 2 days before" },
+];
+
+const ADVANCE_OPTIONS = [
+  { value: 7, label: "Up to 1 week ahead" },
+  { value: 14, label: "Up to 2 weeks ahead" },
+  { value: 30, label: "Up to 1 month ahead" },
+  { value: 60, label: "Up to 2 months ahead" },
+  { value: 90, label: "Up to 3 months ahead" },
+];
+
+const INTERVAL_OPTIONS = [
+  { value: "", label: "Every 30 minutes (default)" },
+  { value: "15", label: "Every 15 minutes" },
+  { value: "60", label: "Every hour" },
+];
+
+const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
+
 function SettingsTab() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
@@ -34,6 +60,7 @@ function SettingsTab() {
   const [saving, setSaving] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<"success" | "info">("success");
 
   async function refresh() {
     const next = await getDashboardData();
@@ -47,6 +74,12 @@ function SettingsTab() {
     void refresh();
   }, []);
 
+  function notify(text: string, tone: "success" | "info" = "success") {
+    setMessageTone(tone);
+    setMessage(text);
+    setTimeout(() => setMessage(null), 4000);
+  }
+
   async function saveProfile() {
     if (!business) return;
     setSaving(true);
@@ -59,7 +92,24 @@ function SettingsTab() {
         whatsappNumber: business.whatsappNumber,
         bookingPageLanguage: business.bookingPageLanguage,
       });
-      setMessage("Profile saved.");
+      notify("✓ Profile saved");
+      await refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveBookingRules() {
+    if (!business) return;
+    setSaving(true);
+    try {
+      await updateBusiness({
+        id: business.id,
+        minNoticeMinutes: business.minNoticeMinutes,
+        maxAdvanceDays: business.maxAdvanceDays,
+        slotIntervalMinutes: business.slotIntervalMinutes,
+      });
+      notify("✓ Booking rules saved");
       await refresh();
     } finally {
       setSaving(false);
@@ -78,6 +128,7 @@ function SettingsTab() {
                 name: service.name,
                 durationMinutes: service.durationMinutes,
                 priceLabel: service.priceLabel,
+                allDay: service.allDay,
               })
             : updateService({
                 id: service.id,
@@ -86,17 +137,18 @@ function SettingsTab() {
                 durationMinutes: service.durationMinutes,
                 priceLabel: service.priceLabel,
                 active: service.active,
+                allDay: service.allDay,
               }),
         ),
       );
-      setMessage("Services saved.");
+      notify("✓ Services saved");
       await refresh();
     } finally {
       setSaving(false);
     }
   }
 
-  async function saveAvailability() {
+  async function saveAvailabilityRows() {
     if (!business) return;
     setSaving(true);
     try {
@@ -109,7 +161,7 @@ function SettingsTab() {
           closesAt: entry.closesAt,
         })),
       });
-      setMessage("Availability saved.");
+      notify("✓ Opening hours saved");
       await refresh();
     } finally {
       setSaving(false);
@@ -142,9 +194,9 @@ function SettingsTab() {
         window.location.href = result.url;
         return;
       }
-      setMessage("Online upgrades are almost ready. Contact Octolabs to enable Pro or Studio.");
+      notify("Online upgrades are almost ready. Contact Octolabs to enable Pro or Studio.", "info");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Checkout could not start.");
+      notify(error instanceof Error ? error.message : "Checkout could not start.", "info");
     } finally {
       setCheckoutPlan(null);
     }
@@ -154,66 +206,90 @@ function SettingsTab() {
 
   const bookingLink = `${getSiteUrl()}/b/${business.slug}`;
   const usageLabel = data.usage.limit
-    ? `${data.usage.used} / ${data.usage.limit} bookings used`
+    ? `${data.usage.used}/${data.usage.limit} bookings used`
     : "Unlimited bookings";
   const usagePercent = data.usage.limit
     ? Math.min(100, (data.usage.used / data.usage.limit) * 100)
     : 100;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <div>
-        <Kicker>Account - Plan - Profile</Kicker>
-        <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">Settings</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Manage the business profile, services, availability, and plan.
+        <h1 className="text-xl font-bold tracking-tight text-foreground">Settings</h1>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          Manage your business profile, services, hours and plan.
         </p>
       </div>
 
       {message && (
-        <div className="border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">
+        <div
+          className={`rounded-[10px] border px-3.5 py-2.5 text-sm ${
+            messageTone === "success"
+              ? "border-success/30 bg-success-soft text-success"
+              : "border-primary-mid bg-primary-soft text-primary"
+          }`}
+        >
           {message}
         </div>
       )}
 
-      <Panel className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="kicker text-accent">Current plan</div>
-          <div className="mt-2 flex items-baseline gap-3">
-            <span className="font-display text-3xl font-light tracking-[0.05em] text-foreground">
+      {/* Plan */}
+      <div className="rounded-xl border border-primary-mid bg-primary-soft p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="kicker mb-1 text-primary">Current plan</div>
+            <div className="text-[15px] font-bold capitalize text-foreground">
               {business.plan}
-            </span>
-            <span className="text-xs text-muted-foreground">{usageLabel} this month</span>
+              <span className="ml-2 text-[13px] font-normal text-muted-foreground">
+                · {usageLabel} this month
+              </span>
+            </div>
           </div>
-          <div className="mt-3 h-1 w-full max-w-xs bg-muted">
-            <div className="h-full bg-accent" style={{ width: `${usagePercent}%` }} />
+          {business.plan === "free" && (
+            <div className="flex gap-2">
+              <button
+                disabled={checkoutPlan !== null}
+                onClick={() => void startCheckout("pro")}
+                className="btn-solid px-3.5 py-2 text-xs"
+              >
+                {checkoutPlan === "pro" ? "Opening…" : "Upgrade to Pro — $5/mo"}
+              </button>
+              <button
+                disabled={checkoutPlan !== null}
+                onClick={() => void startCheckout("studio")}
+                className="btn-frame-primary px-3.5 py-2 text-xs"
+              >
+                {checkoutPlan === "studio" ? "Opening…" : "Studio — $12/mo"}
+              </button>
+            </div>
+          )}
+        </div>
+        {data.usage.limit !== null && (
+          <div className="mt-3 h-1.5 w-full max-w-sm overflow-hidden rounded-full bg-white/60">
+            <div
+              className={`h-full rounded-full transition-all ${
+                usagePercent >= 90 ? "bg-destructive" : "bg-primary"
+              }`}
+              style={{ width: `${usagePercent}%` }}
+            />
           </div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            disabled={checkoutPlan !== null}
-            onClick={() => void startCheckout("pro")}
-            className="btn-frame"
-          >
-            {checkoutPlan === "pro" ? "Opening" : "Pro"}
-          </button>
-          <button
-            disabled={checkoutPlan !== null}
-            onClick={() => void startCheckout("studio")}
-            className="btn-solid"
-          >
-            {checkoutPlan === "studio" ? "Opening" : "Studio"}
-          </button>
-        </div>
-      </Panel>
+        )}
+      </div>
 
-      <Panel className="p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <Kicker tone="accent">Business profile</Kicker>
-          <button disabled={saving} onClick={saveProfile} className="btn-frame-primary">
-            Save
-          </button>
-        </div>
+      {/* Business profile */}
+      <Panel className="p-5">
+        <SectionHeader
+          title="Business profile"
+          action={
+            <button
+              disabled={saving}
+              onClick={saveProfile}
+              className="btn-solid px-3.5 py-2 text-xs"
+            >
+              Save
+            </button>
+          }
+        />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
             label="Business name"
@@ -231,150 +307,291 @@ function SettingsTab() {
             onChange={(value) => setBusiness({ ...business, category: value })}
           />
           <Field
-            label="WhatsApp"
+            label="WhatsApp number"
             value={business.whatsappNumber}
             onChange={(value) => setBusiness({ ...business, whatsappNumber: value })}
           />
           <div>
-            <div className="kicker">Language</div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="kicker mb-2">Booking page language</div>
+            <div className="grid grid-cols-3 gap-2">
               {LANGS.map((lang) => (
                 <button
                   key={lang}
                   onClick={() => setBusiness({ ...business, bookingPageLanguage: lang })}
-                  className={`border px-3 py-2 font-display text-xs tracking-[0.18em] uppercase ${
+                  className={`rounded-[10px] border-[1.5px] px-2 py-2 text-xs transition-all ${
                     business.bookingPageLanguage === lang
-                      ? "border-primary bg-primary/15 text-primary"
-                      : "border-border-strong text-muted-foreground hover:border-accent"
+                      ? "border-primary bg-primary-soft font-semibold text-primary"
+                      : "border-border bg-white text-muted-foreground hover:border-primary-mid"
                   }`}
                 >
-                  {lang}
+                  {lang === "Francais" ? "Français" : lang}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <div className="kicker">Public link</div>
-            <div className="mt-3 flex items-center gap-3 border border-border-strong px-3 py-2">
-              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+            <div className="kicker mb-2">Public booking link</div>
+            <div className="flex items-center gap-2 rounded-[10px] border border-border bg-surface px-3 py-2.5">
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
                 {bookingLink}
               </span>
               <Link
                 to="/b/$slug"
                 params={{ slug: business.slug }}
-                className="font-display text-[10px] tracking-[0.25em] uppercase text-accent"
+                className="shrink-0 text-xs font-semibold text-primary hover:underline"
               >
-                Open
+                Open →
               </Link>
             </div>
           </div>
         </div>
       </Panel>
 
-      <Panel className="p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <Kicker tone="accent">Services</Kicker>
-          <div className="flex gap-2">
+      {/* Booking rules */}
+      <Panel className="p-5">
+        <SectionHeader
+          title="Booking rules"
+          sub="Control how customers can schedule with you."
+          action={
             <button
-              onClick={() =>
-                setServices([
-                  ...services,
-                  {
-                    id: `new_${Date.now()}`,
-                    businessId: business.id,
-                    name: "",
-                    durationMinutes: 45,
-                    priceLabel: "",
-                    active: true,
-                  },
-                ])
-              }
-              className="btn-frame"
+              disabled={saving}
+              onClick={saveBookingRules}
+              className="btn-solid px-3.5 py-2 text-xs"
             >
-              Add
-            </button>
-            <button disabled={saving} onClick={saveServices} className="btn-frame-primary">
               Save
             </button>
+          }
+        />
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="kicker mb-1.5 block">Minimum notice before booking</label>
+            <select
+              value={business.minNoticeMinutes}
+              onChange={(event) =>
+                setBusiness({ ...business, minNoticeMinutes: Number(event.target.value) })
+              }
+              className="input-field"
+            >
+              {NOTICE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Stops last-minute bookings you can't prepare for.
+            </p>
+          </div>
+          <div>
+            <label className="kicker mb-1.5 block">How far ahead customers can book</label>
+            <select
+              value={business.maxAdvanceDays}
+              onChange={(event) =>
+                setBusiness({ ...business, maxAdvanceDays: Number(event.target.value) })
+              }
+              className="input-field"
+            >
+              {ADVANCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              How many days of dates the booking page shows.
+            </p>
+          </div>
+          <div>
+            <label className="kicker mb-1.5 block">Booking slot interval</label>
+            <select
+              value={
+                business.slotIntervalMinutes == null ? "" : String(business.slotIntervalMinutes)
+              }
+              onChange={(event) =>
+                setBusiness({
+                  ...business,
+                  slotIntervalMinutes:
+                    event.target.value === "" ? null : Number(event.target.value),
+                })
+              }
+              className="input-field"
+            >
+              {INTERVAL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              How close together start times appear (e.g. 9:00, 9:30…).
+            </p>
           </div>
         </div>
-        <div className="space-y-4">
-          {services.map((service, index) => (
-            <div
-              key={service.id}
-              className="grid gap-3 border border-border-strong p-4 sm:grid-cols-[1fr_120px_120px_auto]"
-            >
-              <input
-                value={service.name}
-                onChange={(event) =>
-                  replaceService(
-                    index,
-                    { ...service, name: event.target.value },
-                    services,
-                    setServices,
-                  )
-                }
-                placeholder="Service name"
-                className="bg-transparent text-sm text-foreground focus:outline-none"
-              />
-              <input
-                value={service.durationMinutes}
-                onChange={(event) =>
-                  replaceService(
-                    index,
-                    { ...service, durationMinutes: Number(event.target.value) },
-                    services,
-                    setServices,
-                  )
-                }
-                type="number"
-                min={15}
-                step={15}
-                className="bg-transparent text-sm text-foreground focus:outline-none"
-              />
-              <input
-                value={service.priceLabel}
-                onChange={(event) =>
-                  replaceService(
-                    index,
-                    { ...service, priceLabel: event.target.value },
-                    services,
-                    setServices,
-                  )
-                }
-                placeholder="Rs 350"
-                className="bg-transparent text-sm text-foreground focus:outline-none"
-              />
+      </Panel>
+
+      {/* Services */}
+      <Panel className="p-5">
+        <SectionHeader
+          title="Services"
+          sub="Each service controls its own duration — slots follow automatically."
+          action={
+            <div className="flex gap-2">
               <button
-                onClick={() => void removeService(service)}
-                className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground hover:text-destructive"
+                onClick={() =>
+                  setServices([
+                    ...services,
+                    {
+                      id: `new_${Date.now()}`,
+                      businessId: business.id,
+                      name: "",
+                      durationMinutes: 45,
+                      priceLabel: "",
+                      active: true,
+                      allDay: false,
+                    },
+                  ])
+                }
+                className="btn-frame px-3.5 py-2 text-xs"
               >
-                Remove
+                + Add
               </button>
+              <button
+                disabled={saving}
+                onClick={saveServices}
+                className="btn-solid px-3.5 py-2 text-xs"
+              >
+                Save
+              </button>
+            </div>
+          }
+        />
+        <div className="space-y-3">
+          {services.length === 0 && (
+            <p className="rounded-lg bg-surface px-3.5 py-3 text-[13px] text-muted-foreground">
+              No services yet — add your first one.
+            </p>
+          )}
+          {services.map((service, index) => (
+            <div key={service.id} className="rounded-xl border border-border p-3.5">
+              <div className="grid gap-3 sm:grid-cols-[1fr_150px_110px_auto] sm:items-end">
+                <div>
+                  <label className="kicker mb-1.5 block">Service name</label>
+                  <input
+                    value={service.name}
+                    onChange={(event) =>
+                      replaceService(
+                        index,
+                        { ...service, name: event.target.value },
+                        services,
+                        setServices,
+                      )
+                    }
+                    placeholder="e.g. Haircut"
+                    className="input-field"
+                  />
+                </div>
+                <div>
+                  <label className="kicker mb-1.5 block">Duration</label>
+                  <select
+                    value={service.allDay ? "all-day" : String(service.durationMinutes)}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      if (value === "all-day") {
+                        replaceService(
+                          index,
+                          { ...service, allDay: true, durationMinutes: 480 },
+                          services,
+                          setServices,
+                        );
+                      } else {
+                        replaceService(
+                          index,
+                          { ...service, allDay: false, durationMinutes: Number(value) },
+                          services,
+                          setServices,
+                        );
+                      }
+                    }}
+                    className="input-field"
+                  >
+                    {DURATION_OPTIONS.map((duration) => (
+                      <option key={duration} value={duration}>
+                        {duration >= 60
+                          ? `${Math.floor(duration / 60)}h${duration % 60 ? ` ${duration % 60}m` : ""}`
+                          : `${duration} min`}
+                      </option>
+                    ))}
+                    {!DURATION_OPTIONS.includes(service.durationMinutes) && !service.allDay && (
+                      <option value={service.durationMinutes}>
+                        {service.durationMinutes} min (custom)
+                      </option>
+                    )}
+                    <option value="all-day">Full day</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="kicker mb-1.5 block">Price</label>
+                  <input
+                    value={service.priceLabel}
+                    onChange={(event) =>
+                      replaceService(
+                        index,
+                        { ...service, priceLabel: event.target.value },
+                        services,
+                        setServices,
+                      )
+                    }
+                    placeholder="Rs 350"
+                    className="input-field"
+                  />
+                </div>
+                <button
+                  onClick={() => void removeService(service)}
+                  className="justify-self-start rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive sm:justify-self-auto"
+                >
+                  Remove
+                </button>
+              </div>
+              {service.allDay && (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Full-day service: customers pick a date, and one booking takes the whole working
+                  day.
+                </p>
+              )}
             </div>
           ))}
         </div>
       </Panel>
 
-      <Panel className="p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <Kicker tone="accent">Availability</Kicker>
-          <button disabled={saving} onClick={saveAvailability} className="btn-frame-primary">
-            Save
-          </button>
-        </div>
-        <div className="divide-y divide-border border border-border-strong">
+      {/* Opening hours */}
+      <Panel className="p-5">
+        <SectionHeader
+          title="Opening hours"
+          sub="Customers can only book inside these hours."
+          action={
+            <button
+              disabled={saving}
+              onClick={saveAvailabilityRows}
+              className="btn-solid px-3.5 py-2 text-xs"
+            >
+              Save
+            </button>
+          }
+        />
+        <div className="overflow-hidden rounded-xl border border-border">
           {availability
             .slice()
             .sort((a, b) => sortDay(a.dayOfWeek) - sortDay(b.dayOfWeek))
-            .map((entry) => (
+            .map((entry, index, arr) => (
               <div
                 key={entry.id}
-                className="grid grid-cols-[56px_1fr] gap-3 px-4 py-3 sm:grid-cols-[72px_100px_1fr] sm:items-center"
+                className={`flex flex-wrap items-center gap-3 px-4 py-3 ${
+                  index < arr.length - 1 ? "border-b border-border" : ""
+                }`}
               >
-                <div className="font-display text-sm tracking-[0.15em] uppercase text-foreground">
+                <span className="min-w-[44px] text-[13px] font-medium text-foreground">
                   {DAY_LABELS[entry.dayOfWeek]}
-                </div>
+                </span>
                 <button
                   onClick={() =>
                     patchAvailability(
@@ -384,44 +601,45 @@ function SettingsTab() {
                       setAvailability,
                     )
                   }
-                  className={`w-fit border px-2 py-1 font-display text-[10px] tracking-[0.2em] uppercase ${
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                     entry.isOpen
-                      ? "border-success/40 text-success"
-                      : "border-border-strong text-muted-foreground"
+                      ? "bg-success-soft text-success"
+                      : "bg-surface-2 text-muted-foreground"
                   }`}
                 >
                   {entry.isOpen ? "Open" : "Closed"}
                 </button>
-                <div className="col-span-2 flex gap-2 sm:col-span-1">
-                  <input
-                    value={entry.opensAt}
-                    disabled={!entry.isOpen}
-                    onChange={(event) =>
-                      patchAvailability(
-                        entry.dayOfWeek,
-                        { opensAt: event.target.value },
-                        availability,
-                        setAvailability,
-                      )
-                    }
-                    type="time"
-                    className="border border-border-strong bg-card px-2 py-1 text-sm text-foreground disabled:opacity-40"
-                  />
-                  <input
-                    value={entry.closesAt}
-                    disabled={!entry.isOpen}
-                    onChange={(event) =>
-                      patchAvailability(
-                        entry.dayOfWeek,
-                        { closesAt: event.target.value },
-                        availability,
-                        setAvailability,
-                      )
-                    }
-                    type="time"
-                    className="border border-border-strong bg-card px-2 py-1 text-sm text-foreground disabled:opacity-40"
-                  />
-                </div>
+                {entry.isOpen && (
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <input
+                      value={entry.opensAt}
+                      onChange={(event) =>
+                        patchAvailability(
+                          entry.dayOfWeek,
+                          { opensAt: event.target.value },
+                          availability,
+                          setAvailability,
+                        )
+                      }
+                      type="time"
+                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                    />
+                    <span className="text-xs text-muted-foreground">–</span>
+                    <input
+                      value={entry.closesAt}
+                      onChange={(event) =>
+                        patchAvailability(
+                          entry.dayOfWeek,
+                          { closesAt: event.target.value },
+                          availability,
+                          setAvailability,
+                        )
+                      }
+                      type="time"
+                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                )}
               </div>
             ))}
         </div>
@@ -430,24 +648,42 @@ function SettingsTab() {
   );
 }
 
+function SectionHeader({
+  title,
+  sub,
+  action,
+}: {
+  title: string;
+  sub?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+      <div>
+        <div className="text-[15px] font-bold text-foreground">{title}</div>
+        {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
 function SettingsSkeleton() {
   return (
-    <div className="space-y-8">
-      <div className="space-y-4">
-        <div className="h-3 w-48 animate-pulse bg-muted" />
-        <div className="h-12 w-52 animate-pulse bg-muted" />
-        <div className="h-4 w-80 max-w-full animate-pulse bg-muted" />
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <div className="skeleton h-7 w-36" />
+        <div className="skeleton h-4 w-64 max-w-full" />
       </div>
+      <div className="skeleton h-24 w-full rounded-xl" />
       {[0, 1, 2].map((panel) => (
-        <Panel key={panel} className="p-6">
-          <div className="space-y-4">
-            <div className="h-4 w-36 animate-pulse bg-muted" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="h-12 animate-pulse border-b border-border-strong bg-muted/30" />
-              <div className="h-12 animate-pulse border-b border-border-strong bg-muted/30" />
-            </div>
+        <div key={panel} className="rounded-2xl border border-border bg-card p-5">
+          <div className="skeleton mb-4 h-5 w-40" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="skeleton h-11" />
+            <div className="skeleton h-11" />
           </div>
-        </Panel>
+        </div>
       ))}
     </div>
   );
@@ -463,14 +699,14 @@ function Field({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="block border-b border-border-strong">
-      <span className="kicker">{label}</span>
+    <div>
+      <label className="kicker mb-1.5 block">{label}</label>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full bg-transparent py-3 text-base text-foreground focus:outline-none"
+        className="input-field"
       />
-    </label>
+    </div>
   );
 }
 

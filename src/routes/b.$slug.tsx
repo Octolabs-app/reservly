@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
 import { createBooking, getAvailableSlots, getPublicBusinessBySlug } from "@/lib/cf/client-data";
+import { getSiteUrl } from "@/lib/reservly/env";
 import { addDays, dateInputFromDate } from "@/lib/reservly/slots";
 import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/reservly/types";
 
@@ -18,6 +19,24 @@ export const Route = createFileRoute("/b/$slug")({
   component: BookingPage,
 });
 
+const CATEGORY_ICONS: Record<string, string> = {
+  Beauty: "💇",
+  Health: "🏥",
+  Fitness: "🏋️",
+  Tutor: "📚",
+  Home: "🔧",
+  Hospitality: "🏨",
+  Other: "⭐",
+};
+
+const SLOT_REASON_LABEL: Record<NonNullable<Slot["reason"]>, string> = {
+  past: "This time has passed",
+  taken: "Already booked",
+  full: "Online booking is full this month",
+  notice: "Too soon — the business needs more notice",
+  closed: "Closed",
+};
+
 function BookingPage() {
   const { slug } = Route.useParams();
   const [data, setData] = useState<PublicBusiness | null>(null);
@@ -26,26 +45,30 @@ function BookingPage() {
   const [serviceId, setServiceId] = useState<string>("");
   const [date, setDate] = useState("");
   const [slots, setSlots] = useState<Slot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState<BookingLanguage>("Both");
   const [submitting, setSubmitting] = useState(false);
 
+  const maxDays = Math.min(data?.business.maxAdvanceDays ?? 14, 30);
   const dates = useMemo(
     () =>
-      Array.from({ length: 10 }, (_, index) => {
+      Array.from({ length: maxDays }, (_, index) => {
         const next = addDays(new Date(), index);
         return {
           value: dateInputFromDate(next),
-          label: next.toLocaleDateString("en-GB", {
+          day: next.toLocaleDateString("en-GB", { weekday: "short" }),
+          num: next.getDate(),
+          full: next.toLocaleDateString("en-GB", {
             weekday: "short",
             day: "2-digit",
             month: "short",
           }),
         };
       }),
-    [],
+    [maxDays],
   );
 
   useEffect(() => {
@@ -54,23 +77,32 @@ function BookingPage() {
       .then((result) => {
         setData(result);
         setServiceId(result?.services[0]?.id ?? "");
-        setDate(dates[0]?.value ?? "");
+        setDate(dateInputFromDate(new Date()));
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Booking page failed to load."))
       .finally(() => setLoading(false));
-  }, [slug, dates]);
+  }, [slug]);
 
   useEffect(() => {
     if (!data || !serviceId || !date) return;
     setSelectedSlot(null);
+    setSlotsLoading(true);
     getAvailableSlots(data.business.id, serviceId, date)
       .then(setSlots)
-      .catch((err) => setError(err instanceof Error ? err.message : "Slots failed to load."));
+      .catch((err) => setError(err instanceof Error ? err.message : "Slots failed to load."))
+      .finally(() => setSlotsLoading(false));
   }, [data, serviceId, date]);
 
   const service = data?.services.find((entry) => entry.id === serviceId) ?? null;
   const phoneValidation = validateWhatsAppNumber(phone);
   const ready = Boolean(service && selectedSlot && name.trim().length > 1 && !phoneValidation);
+  const progress =
+    (service ? 1 : 0) +
+    (date ? 1 : 0) +
+    (selectedSlot ? 1 : 0) +
+    (name.trim() && phone.trim() && !phoneValidation ? 1 : 0);
+  const selectedDate = dates.find((entry) => entry.value === date);
+  const siteHost = getSiteUrl().replace(/^https?:\/\//, "");
 
   async function confirm() {
     if (!data || !service || !selectedSlot || !ready) return;
@@ -96,181 +128,252 @@ function BookingPage() {
   return (
     <>
       <SiteHeader />
-      <Page width="md">
+      <Page width="sm">
         {loading && <BookingPageSkeleton />}
 
         {!loading && !data && (
-          <Panel className="p-8">
-            <Kicker tone="accent">Not found</Kicker>
-            <h1 className="mt-4 font-serif text-4xl text-foreground">
-              This booking page is unavailable.
-            </h1>
+          <Panel className="p-8 text-center">
+            <div className="mb-3 text-4xl">🔍</div>
+            <h1 className="text-lg font-bold text-foreground">This booking page is unavailable.</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Check the link with the business, or try again later.
+            </p>
           </Panel>
         )}
 
         {data && (
-          <>
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <Kicker tone="accent">Booking - {service?.name ?? "Choose a service"}</Kicker>
-                <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">
-                  {data.business.name}
-                </h1>
-                <div className="mt-2 font-display text-[11px] tracking-[0.3em] uppercase text-muted-foreground">
-                  {data.business.category} - {data.business.city} - reservly.app/b/
-                  {data.business.slug}
-                </div>
+          <Panel className="overflow-hidden">
+            {/* URL bar */}
+            <div className="flex items-center justify-between bg-ink px-4 py-2.5">
+              <span className="truncate font-mono text-[11px] text-white/50">
+                {siteHost}/b/{data.business.slug}
+              </span>
+            </div>
+
+            {/* Progress */}
+            <div className="h-[3px] bg-surface-2">
+              <div
+                className="h-[3px] bg-primary transition-all duration-300"
+                style={{ width: `${progress * 25}%` }}
+              />
+            </div>
+
+            {/* Business header */}
+            <div className="flex items-center gap-3.5 border-b border-border px-5 py-4">
+              <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-2xl">
+                {CATEGORY_ICONS[data.business.category] ?? "⭐"}
               </div>
-              <div className="hidden h-16 w-16 items-center justify-center border border-accent/40 text-2xl text-accent sm:flex">
-                R
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-base font-bold text-foreground">
+                  {data.business.name}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded-full border border-primary/25 bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    {data.business.category}
+                  </span>
+                  {data.business.city && (
+                    <span className="text-xs text-muted-foreground">· {data.business.city}</span>
+                  )}
+                </div>
               </div>
             </div>
 
-            {data.usage.full && (
-              <div className="mb-6 border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-warning">
-                Online booking is full for this month. Please contact the business on WhatsApp.
-              </div>
-            )}
+            <div className="space-y-7 px-5 pb-6 pt-5">
+              {data.usage.full && (
+                <div className="rounded-lg border border-warning/30 bg-warning-soft px-3.5 py-2.5 text-sm text-warning">
+                  Online booking is full for this month. Please contact the business on WhatsApp.
+                </div>
+              )}
 
-            {error && (
-              <div className="mb-6 border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                {error}
-              </div>
-            )}
+              {error && (
+                <div className="rounded-lg border border-destructive/25 bg-destructive-soft px-3.5 py-2.5 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
 
-            <Panel className="p-6 sm:p-8">
-              <div className="space-y-10">
-                <Section label="01 - Pick a service">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {data.services.map((entry) => (
-                      <ServiceButton
-                        key={entry.id}
-                        service={entry}
-                        active={entry.id === serviceId}
-                        onClick={() => setServiceId(entry.id)}
-                      />
-                    ))}
-                  </div>
-                </Section>
+              {/* 1 — Service */}
+              <Section label="1 — Pick a service">
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {data.services.map((entry) => (
+                    <ServiceButton
+                      key={entry.id}
+                      service={entry}
+                      active={entry.id === serviceId}
+                      onClick={() => setServiceId(entry.id)}
+                    />
+                  ))}
+                </div>
+              </Section>
 
-                <Section label="02 - Pick a date">
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {dates.map((entry) => (
+              {/* 2 — Date */}
+              <Section label="2 — Pick a date">
+                <div className="flex gap-1.5 overflow-x-auto pb-1.5">
+                  {dates.map((entry) => {
+                    const active = date === entry.value;
+                    return (
                       <button
                         key={entry.value}
                         onClick={() => setDate(entry.value)}
-                        className={`min-w-[92px] border p-3 text-center transition-all ${
-                          date === entry.value
-                            ? "border-primary bg-primary/10"
-                            : "border-border-strong hover:border-accent/60"
+                        className={`min-w-[52px] shrink-0 rounded-xl border-[1.5px] px-1.5 py-2 text-center transition-all ${
+                          active
+                            ? "border-primary bg-primary text-white"
+                            : "border-border bg-white hover:border-primary-mid"
                         }`}
                       >
-                        <div className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
-                          {entry.label.split(" ")[0]}
+                        <div
+                          className={`text-[10px] ${active ? "text-white/70" : "text-muted-foreground"}`}
+                        >
+                          {entry.day}
                         </div>
-                        <div className="mt-1 font-display text-sm tracking-[0.08em] text-foreground">
-                          {entry.label.replace(/^\S+\s/, "")}
+                        <div
+                          className={`mt-0.5 text-[17px] font-semibold ${
+                            active ? "text-white" : "text-foreground"
+                          }`}
+                        >
+                          {entry.num}
                         </div>
                       </button>
+                    );
+                  })}
+                </div>
+              </Section>
+
+              {/* 3 — Time */}
+              <Section label={service?.allDay ? "3 — Confirm the day" : "3 — Pick a time"}>
+                {slotsLoading ? (
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[0, 1, 2, 3, 4, 5].map((item) => (
+                      <div key={item} className="skeleton h-10" />
                     ))}
                   </div>
-                </Section>
-
-                <Section label="03 - Pick a time">
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                    {slots.length === 0 && (
-                      <div className="col-span-full border border-border-strong p-4 text-sm text-muted-foreground">
-                        No slots on this date.
-                      </div>
-                    )}
-                    {slots.map((slot) => (
-                      <button
-                        key={slot.startAt}
-                        disabled={!slot.available}
-                        onClick={() => setSelectedSlot(slot)}
-                        title={slot.reason}
-                        className={`py-2.5 text-center font-display text-sm tracking-[0.1em] transition-all ${
-                          !slot.available
-                            ? "border border-border bg-muted/40 text-muted-foreground/40 line-through"
-                            : selectedSlot?.startAt === slot.startAt
-                              ? "border border-primary bg-primary/10 text-primary"
-                              : "border border-border-strong text-foreground hover:border-accent/60"
-                        }`}
-                      >
-                        {slot.time}
-                      </button>
-                    ))}
+                ) : slots.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-surface px-3.5 py-3 text-[13px] text-muted-foreground">
+                    No slots on this date — try another day.
                   </div>
-                </Section>
+                ) : (
+                  <div
+                    className={
+                      service?.allDay
+                        ? "grid grid-cols-1 gap-1.5"
+                        : "grid grid-cols-3 gap-1.5 sm:grid-cols-4"
+                    }
+                  >
+                    {slots.map((slot) => {
+                      const active = selectedSlot?.startAt === slot.startAt;
+                      return (
+                        <button
+                          key={slot.startAt}
+                          disabled={!slot.available}
+                          onClick={() => setSelectedSlot(slot)}
+                          title={slot.reason ? SLOT_REASON_LABEL[slot.reason] : undefined}
+                          className={`rounded-[10px] border-[1.5px] py-2.5 text-center text-[13px] transition-all ${
+                            !slot.available
+                              ? "cursor-not-allowed border-border bg-surface text-muted-foreground/50 line-through opacity-60"
+                              : active
+                                ? "border-primary bg-primary font-semibold text-white"
+                                : "border-border bg-white text-foreground hover:border-primary-mid"
+                          }`}
+                        >
+                          {slot.time}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {service?.allDay && slots.some((slot) => slot.available) && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    This service takes the whole day — one booking per date.
+                  </p>
+                )}
+              </Section>
 
-                <Section label="04 - Your details">
-                  <div className="space-y-4">
-                    <Field label="Your name">
-                      <input
-                        value={name}
-                        onChange={(event) => setName(event.target.value)}
-                        placeholder="Marie Dupont"
-                        className="w-full bg-transparent py-3 text-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                      />
-                    </Field>
-                    <Field label="WhatsApp number">
-                      <input
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                        onBlur={() => {
-                          const normalized = normalizeWhatsAppNumber(phone);
-                          if (!validateWhatsAppNumber(normalized)) setPhone(normalized);
-                        }}
-                        placeholder="+230 5700 0000"
-                        className="w-full bg-transparent py-3 text-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                      />
-                    </Field>
+              {/* 4 — Details */}
+              <Section label="4 — Your details">
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="kicker mb-1.5 block">Your name *</label>
+                    <input
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Marie Dupont"
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="kicker mb-1.5 block">WhatsApp number *</label>
+                    <input
+                      value={phone}
+                      onChange={(event) => setPhone(event.target.value)}
+                      onBlur={() => {
+                        const normalized = normalizeWhatsAppNumber(phone);
+                        if (!validateWhatsAppNumber(normalized)) setPhone(normalized);
+                      }}
+                      inputMode="tel"
+                      placeholder="+230 5700 0000"
+                      className="input-field"
+                    />
                     <p
-                      className={`text-xs ${
+                      className={`mt-1 text-[11px] ${
                         phone.trim() && phoneValidation
                           ? "text-destructive"
                           : "text-muted-foreground"
                       }`}
                     >
                       {phone.trim() && phoneValidation
-                        ? phoneValidation
-                        : "Use an international WhatsApp number. Mauritius mobile numbers can be entered as 5XXXXXXX."}
+                        ? `⚠ ${phoneValidation}`
+                        : "Your confirmation is sent to this number. Mauritius mobiles can be entered as 5XXX XXXX."}
                     </p>
-                    <div>
-                      <div className="kicker">Language</div>
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        {(["English", "Francais", "Both"] as BookingLanguage[]).map((entry) => (
-                          <button
-                            key={entry}
-                            onClick={() => setLanguage(entry)}
-                            className={`border px-3 py-2 font-display text-xs tracking-[0.18em] uppercase ${
-                              language === entry
-                                ? "border-primary bg-primary/15 text-primary"
-                                : "border-border-strong text-muted-foreground hover:border-accent"
-                            }`}
-                          >
-                            {entry}
-                          </button>
-                        ))}
-                      </div>
+                  </div>
+                  <div>
+                    <div className="kicker mb-2">Language</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(["English", "Francais", "Both"] as BookingLanguage[]).map((entry) => (
+                        <button
+                          key={entry}
+                          onClick={() => setLanguage(entry)}
+                          className={`rounded-[10px] border-[1.5px] px-3 py-2 text-[13px] transition-all ${
+                            language === entry
+                              ? "border-primary bg-primary-soft font-semibold text-primary"
+                              : "border-border bg-white text-muted-foreground hover:border-primary-mid"
+                          }`}
+                        >
+                          {entry === "Francais" ? "Français" : entry}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                </Section>
+                </div>
+              </Section>
 
+              {/* Summary + CTA */}
+              <div>
+                {service && selectedDate && selectedSlot && (
+                  <div className="mb-3 flex items-center gap-2 rounded-[10px] border border-primary-mid bg-primary-soft px-3.5 py-2.5 text-xs text-primary">
+                    <span>📋</span>
+                    <span className="font-medium">
+                      {service.name} · {selectedDate.full}
+                      {service.allDay ? " (all day)" : ` at ${selectedSlot.time}`}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={confirm}
                   disabled={!ready || submitting || data.usage.full}
-                  className="btn-solid w-full py-4"
+                  className={`${ready ? "btn-accent" : "btn-frame"} w-full py-3.5 text-[15px]`}
                 >
                   {submitting
-                    ? "Confirming..."
+                    ? "Confirming…"
                     : ready
-                      ? "Confirm booking"
+                      ? "Confirm booking →"
                       : "Complete all steps above"}
                 </button>
+                <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                  <span className="text-[13px] text-wa">●</span>
+                  Confirmation via WhatsApp · no account needed
+                </div>
               </div>
-            </Panel>
-          </>
+            </div>
+          </Panel>
         )}
       </Page>
     </>
@@ -287,33 +390,36 @@ function validateWhatsAppNumber(value: string) {
   const normalized = normalizeWhatsAppNumber(value);
   if (!normalized) return "WhatsApp number is required.";
   if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
-    return "Enter a valid international WhatsApp number, for example +23057000000.";
+    return "Enter a valid international WhatsApp number, for example +230 5700 0000.";
   }
   return null;
 }
 
 function BookingPageSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <div className="h-3 w-40 animate-pulse bg-muted" />
-        <div className="h-12 w-3/4 animate-pulse bg-muted" />
-        <div className="h-4 w-2/3 animate-pulse bg-muted" />
+    <Panel className="overflow-hidden">
+      <div className="bg-ink px-4 py-3">
+        <div className="skeleton h-3 w-48 opacity-30" />
       </div>
-      <Panel className="p-6 sm:p-8">
-        <div className="space-y-8">
-          {[0, 1, 2, 3].map((section) => (
-            <div key={section} className="space-y-3">
-              <div className="h-3 w-36 animate-pulse bg-muted" />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="h-16 animate-pulse border border-border-strong bg-muted/40" />
-                <div className="h-16 animate-pulse border border-border-strong bg-muted/40" />
-              </div>
-            </div>
-          ))}
+      <div className="flex items-center gap-3.5 border-b border-border px-5 py-4">
+        <div className="skeleton h-13 w-13 rounded-2xl" />
+        <div className="flex-1 space-y-2">
+          <div className="skeleton h-5 w-40" />
+          <div className="skeleton h-3.5 w-28" />
         </div>
-      </Panel>
-    </div>
+      </div>
+      <div className="space-y-6 px-5 py-5">
+        {[0, 1, 2].map((section) => (
+          <div key={section}>
+            <div className="skeleton mb-3 h-3 w-32" />
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="skeleton h-16" />
+              <div className="skeleton h-16" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
@@ -329,44 +435,35 @@ function ServiceButton({
   return (
     <button
       onClick={onClick}
-      className={`group relative border p-5 text-left transition-all ${
+      className={`rounded-xl border-[1.5px] p-3.5 text-left transition-all ${
         active
-          ? "border-primary bg-primary/10"
-          : "border-border-strong hover:border-accent/60 hover:bg-card"
+          ? "border-primary bg-primary-soft shadow-[0_0_0_3px_rgba(27,79,216,0.09)]"
+          : "border-border bg-white hover:border-primary-mid"
       }`}
     >
-      <div className="font-display text-base tracking-[0.1em] uppercase text-foreground">
-        {service.name}
+      <div className="text-[13px] font-semibold text-foreground">{service.name}</div>
+      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>{service.allDay ? "All day" : formatServiceDuration(service.durationMinutes)}</span>
+        {service.priceLabel && (
+          <span className="font-semibold text-foreground">{service.priceLabel}</span>
+        )}
       </div>
-      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-        <span>{service.durationMinutes} min</span>
-        <span className="font-display tracking-[0.15em] text-accent">{service.priceLabel}</span>
-      </div>
-      {active && (
-        <span className="absolute right-3 top-3 font-display text-[10px] tracking-[0.3em] uppercase text-primary">
-          Selected
-        </span>
-      )}
     </button>
   );
+}
+
+function formatServiceDuration(minutes: number) {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h ${rest}m` : `${hours}h`;
 }
 
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-4 font-display text-[10px] tracking-[0.35em] uppercase text-accent">
-        {label}
-      </div>
+      <div className="kicker mb-3">{label}</div>
       {children}
     </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block border-b border-border-strong">
-      <div className="kicker">{label}</div>
-      {children}
-    </label>
   );
 }

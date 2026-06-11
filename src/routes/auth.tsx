@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
-import { authModeLabel } from "@/lib/cf/auth";
+import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -47,64 +46,81 @@ function AuthPage() {
     <>
       <SiteHeader />
       <Page width="sm">
-        <Kicker tone="accent">{authModeLabel()}</Kicker>
-        <h1 className="mt-5 font-serif text-4xl text-foreground">
-          {mode === "sign-in" ? "Welcome back." : "Create your owner account."}
-        </h1>
+        <Panel className="overflow-hidden">
+          <div className="bg-primary px-6 py-5">
+            <div className="text-[15px] font-bold text-white">
+              {mode === "sign-in" ? "Welcome back" : "Create your owner account"}
+            </div>
+            <div className="mt-0.5 text-xs text-white/70">
+              {mode === "sign-in"
+                ? "Sign in to manage your bookings."
+                : "Free to start — your booking link is minutes away."}
+            </div>
+          </div>
 
-        <Panel className="mt-8 p-6">
-          <div className="space-y-5">
-            <Field label="Email">
+          <form
+            className="space-y-4 p-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
+            }}
+          >
+            <div>
+              <label className="kicker mb-1.5 block" htmlFor="auth-email">
+                Email
+              </label>
               <input
+                id="auth-email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 type="email"
                 autoComplete="email"
-                className="w-full bg-transparent py-3 text-base text-foreground focus:outline-none"
+                placeholder="you@example.com"
+                className="input-field"
               />
-            </Field>
-            <Field label="Password">
+            </div>
+            <div>
+              <label className="kicker mb-1.5 block" htmlFor="auth-password">
+                Password
+              </label>
               <input
+                id="auth-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
                 autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-                className="w-full bg-transparent py-3 text-base text-foreground focus:outline-none"
+                placeholder={mode === "sign-up" ? "At least 6 characters" : "Your password"}
+                className="input-field"
               />
-            </Field>
+            </div>
 
             {error && (
-              <div className="border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/25 bg-destructive-soft px-3 py-2 text-sm text-destructive">
                 {error}
               </div>
             )}
 
             <button
+              type="submit"
               disabled={busy || !email || password.length < 6}
-              onClick={submit}
-              className="btn-solid w-full"
+              className="btn-solid w-full py-3"
             >
-              {busy ? "Working..." : mode === "sign-in" ? "Sign in" : "Create account"}
+              {busy ? "Working…" : mode === "sign-in" ? "Sign in" : "Create account"}
             </button>
-          </div>
-        </Panel>
 
-        <button
-          onClick={() => setMode(mode === "sign-in" ? "sign-up" : "sign-in")}
-          className="mt-6 font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent"
-        >
-          {mode === "sign-in" ? "Create an account" : "I already have an account"}
-        </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "sign-in" ? "sign-up" : "sign-in");
+                setError(null);
+              }}
+              className="block w-full text-center text-[13px] font-medium text-primary hover:underline"
+            >
+              {mode === "sign-in" ? "New here? Create an account" : "I already have an account"}
+            </button>
+          </form>
+        </Panel>
       </Page>
     </>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block border-b border-border-strong">
-      <span className="kicker">{label}</span>
-      {children}
-    </label>
   );
 }

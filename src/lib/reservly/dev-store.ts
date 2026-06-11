@@ -6,6 +6,8 @@ import {
   timeFromMinutes,
 } from "./slots";
 import {
+  DEFAULT_MAX_ADVANCE_DAYS,
+  DEFAULT_MIN_NOTICE_MINUTES,
   FREE_BOOKING_LIMIT,
   type Availability,
   type AvailabilityInput,
@@ -28,7 +30,7 @@ type DevState = {
   bookings: Booking[];
 };
 
-const STATE_KEY = "reservly_dev_state_v3";
+const STATE_KEY = "reservly_dev_state_v4";
 const LAST_BOOKING_KEY = "reservly_last_booking";
 
 const owner: Owner = {
@@ -63,6 +65,9 @@ function defaultState(): DevState {
     timezone: "Indian/Mauritius",
     plan: "free",
     bookingLimitMonthly: FREE_BOOKING_LIMIT,
+    minNoticeMinutes: DEFAULT_MIN_NOTICE_MINUTES,
+    maxAdvanceDays: DEFAULT_MAX_ADVANCE_DAYS,
+    slotIntervalMinutes: null,
     createdAt: new Date().toISOString(),
   };
 
@@ -74,6 +79,7 @@ function defaultState(): DevState {
       durationMinutes: 45,
       priceLabel: "Rs 350",
       active: true,
+      allDay: false,
     },
     {
       id: "svc_colour",
@@ -82,6 +88,7 @@ function defaultState(): DevState {
       durationMinutes: 90,
       priceLabel: "Rs 800",
       active: true,
+      allDay: false,
     },
     {
       id: "svc_blowout",
@@ -90,6 +97,7 @@ function defaultState(): DevState {
       durationMinutes: 30,
       priceLabel: "Rs 250",
       active: true,
+      allDay: false,
     },
   ];
 
@@ -211,6 +219,9 @@ export async function createDevBusiness(input: BusinessInput) {
       timezone: "Indian/Mauritius",
       plan: "free",
       bookingLimitMonthly: FREE_BOOKING_LIMIT,
+      minNoticeMinutes: input.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+      maxAdvanceDays: input.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
+      slotIntervalMinutes: input.slotIntervalMinutes ?? null,
       createdAt: new Date().toISOString(),
     };
 
@@ -240,6 +251,12 @@ export async function updateDevBusiness(input: Partial<BusinessInput> & { id: st
       city: input.city ?? business.city,
       whatsappNumber: input.whatsappNumber ?? business.whatsappNumber,
       bookingPageLanguage: input.bookingPageLanguage ?? business.bookingPageLanguage,
+      minNoticeMinutes: input.minNoticeMinutes ?? business.minNoticeMinutes,
+      maxAdvanceDays: input.maxAdvanceDays ?? business.maxAdvanceDays,
+      slotIntervalMinutes:
+        "slotIntervalMinutes" in input
+          ? (input.slotIntervalMinutes ?? null)
+          : business.slotIntervalMinutes,
       updatedAt: new Date().toISOString(),
     });
     return business;
@@ -255,6 +272,7 @@ export async function createDevService(input: ServiceInput) {
       durationMinutes: input.durationMinutes,
       priceLabel: input.priceLabel,
       active: input.active ?? true,
+      allDay: input.allDay ?? false,
       createdAt: new Date().toISOString(),
     };
     state.services.push(service);
@@ -271,6 +289,7 @@ export async function updateDevService(input: Partial<ServiceInput> & { id: stri
       durationMinutes: input.durationMinutes ?? service.durationMinutes,
       priceLabel: input.priceLabel ?? service.priceLabel,
       active: input.active ?? service.active,
+      allDay: input.allDay ?? service.allDay,
       updatedAt: new Date().toISOString(),
     });
     return service;
@@ -318,7 +337,17 @@ export async function createDevBooking(input: BookingInput) {
     }
 
     const startMs = new Date(input.startAt).getTime();
-    const endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
+    let endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
+    if (service.allDay) {
+      const day = state.availability.find(
+        (entry) =>
+          entry.businessId === business.id && entry.dayOfWeek === new Date(startMs).getUTCDay(),
+      );
+      if (day) {
+        const dateInput = input.startAt.slice(0, 10);
+        endAt = isoFromMauritiusLocal(dateInput, day.closesAt);
+      }
+    }
     const taken = state.bookings.some((booking) => {
       if (booking.businessId !== input.businessId || booking.status === "cancelled") return false;
       return (

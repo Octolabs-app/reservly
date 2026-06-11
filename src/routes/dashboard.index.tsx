@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Kicker, Panel } from "@/components/reservly/AppShell";
+import { EmptyState, Panel, StatusPill } from "@/components/reservly/AppShell";
 import { getDashboardData } from "@/lib/cf/client-data";
 import { getSiteUrl } from "@/lib/reservly/env";
 import { formatDateLabel, formatTimeLabel, getBookingMonthKey } from "@/lib/reservly/slots";
@@ -9,6 +9,13 @@ import type { Booking, DashboardData } from "@/lib/reservly/types";
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardHome,
 });
+
+function greeting(now: Date) {
+  const hour = now.getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  return "Good evening";
+}
 
 function DashboardHome() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -22,7 +29,9 @@ function DashboardHome() {
   const todayKey = now.toISOString().slice(0, 10);
   const monthKey = getBookingMonthKey(now.toISOString());
   const activeBookings = data?.bookings.filter((booking) => booking.status !== "cancelled") ?? [];
-  const today = activeBookings.filter((booking) => booking.startAt.slice(0, 10) === todayKey);
+  const today = activeBookings
+    .filter((booking) => booking.startAt.slice(0, 10) === todayKey)
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   const upcoming = activeBookings.filter(
     (booking) => new Date(booking.startAt).getTime() >= now.getTime(),
   );
@@ -42,9 +51,9 @@ function DashboardHome() {
 
   const nextRows = useMemo(
     () =>
-      upcoming
-        .slice(0, 6)
-        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
+      [...upcoming]
+        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+        .slice(0, 6),
     [upcoming],
   );
 
@@ -55,248 +64,268 @@ function DashboardHome() {
     setTimeout(() => setCopied(false), 1800);
   }
 
+  async function share() {
+    if (!bookingLink || !data?.business) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Book with ${data.business.name}`,
+          url: bookingLink,
+        });
+        return;
+      } catch {
+        /* user dismissed — fall back to copy */
+      }
+    }
+    copy();
+  }
+
   if (!data) return <DashboardSkeleton />;
 
   if (!data.business) {
     return (
-      <Panel className="p-8">
-        <Kicker tone="accent">Setup needed</Kicker>
-        <h1 className="mt-4 font-serif text-4xl text-foreground">Create your booking page.</h1>
-        <Link to="/onboarding" className="btn-solid mt-6 inline-flex">
-          Start onboarding
-        </Link>
+      <Panel>
+        <EmptyState
+          icon="✨"
+          title="Create your booking page"
+          sub="Three quick steps: business info, services, opening hours."
+          action={
+            <Link to="/onboarding" className="btn-solid">
+              Start setup →
+            </Link>
+          }
+        />
       </Panel>
     );
   }
 
+  const usagePct = data.usage.limit ? Math.round((data.usage.used / data.usage.limit) * 100) : 0;
+
   return (
-    <div className="space-y-10">
-      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <Kicker tone="muted">{formatDateLabel(now.toISOString(), { year: "numeric" })}</Kicker>
-          <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">
-            Good morning, {data.owner?.name?.split("@")[0] ?? "owner"}.
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {data.business.name} - {today.length} bookings today, {upcoming.length} upcoming.
-          </p>
-        </div>
-        <button onClick={copy} className={copied ? "btn-frame-primary" : "btn-frame"}>
-          {copied ? "Link copied" : "Copy booking link"}
-        </button>
+    <div className="space-y-5">
+      {/* Greeting */}
+      <div>
+        <h1 className="text-xl font-bold tracking-tight text-foreground">
+          {greeting(now)}, {ownerFirstName(data)} 👋
+        </h1>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">
+          {formatDateLabel(now.toISOString(), { year: "numeric" })} · {data.business.name}
+        </p>
       </div>
 
-      <Panel className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="kicker text-accent">Your booking link</div>
-          <div className="mt-2 font-display text-lg tracking-[0.05em] text-foreground">
+      {/* Booking link banner */}
+      <div className="flex flex-col gap-3 rounded-xl border border-primary-mid bg-primary-soft px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="kicker mb-1 text-primary">Your booking link</div>
+          <div className="truncate font-mono text-[13px] font-medium text-foreground">
             {displayUrl}
           </div>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button onClick={copy} className="btn-frame self-start sm:self-auto">
-            {copied ? "Copied" : "Copy"}
+        <div className="flex shrink-0 flex-wrap gap-1.5">
+          <button onClick={copy} className="btn-frame px-3 py-2 text-xs">
+            {copied ? "✓ Copied" : "Copy"}
           </button>
           <a
             href={whatsAppShareUrl}
             target="_blank"
             rel="noreferrer"
-            className="btn-frame self-start sm:self-auto"
+            className="btn-wa px-3 py-2 text-xs"
           >
             WhatsApp
           </a>
+          <button onClick={share} className="btn-solid px-3 py-2 text-xs">
+            Share
+          </button>
           <a
             href={`/b/${data.business.slug}`}
             target="_blank"
             rel="noreferrer"
-            className="btn-frame self-start sm:self-auto"
+            className="btn-frame px-3 py-2 text-xs"
           >
             Preview
           </a>
         </div>
-      </Panel>
+      </div>
 
-      <div className="grid grid-cols-2 border border-border-strong sm:grid-cols-4">
-        <StatCell
-          val={String(today.length)}
-          label="Today"
-          tone="primary"
-          border="sm:border-r"
-          mobileBorder="border-r"
-          bottom="border-b sm:border-b-0"
-        />
-        <StatCell
-          val={String(thisWeek)}
-          label="This week"
-          tone="neutral"
-          border="sm:border-r"
-          bottom="border-b sm:border-b-0"
-        />
-        <StatCell
-          val={String(monthCount)}
-          label="This month"
-          tone="accent"
-          border="sm:border-r"
-          mobileBorder="border-r"
-        />
-        <StatCell
-          val={data.usage.limit ? `${data.usage.used}/${data.usage.limit}` : "Unlimited"}
+      {/* Plan usage warning */}
+      {data.usage.limit !== null && usagePct >= 60 && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2.5 rounded-[10px] border px-3.5 py-2.5 ${
+            usagePct >= 90
+              ? "border-destructive/30 bg-destructive-soft"
+              : "border-warning/30 bg-warning-soft"
+          }`}
+        >
+          <div className={`text-xs ${usagePct >= 90 ? "text-destructive" : "text-warning"}`}>
+            {data.usage.used}/{data.usage.limit} free bookings used this month
+            {usagePct >= 90 && " — almost at your limit!"}
+          </div>
+          <Link to="/dashboard/settings" className="btn-solid px-3 py-1.5 text-xs">
+            Upgrade
+          </Link>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <StatCard val={String(today.length)} label="Today" tone="primary" />
+        <StatCard val={String(thisWeek)} label="This week" tone="neutral" />
+        <StatCard val={String(monthCount)} label="This month" tone="success" />
+        <StatCard
+          val={data.usage.limit ? `${data.usage.used}/${data.usage.limit}` : "∞"}
           label="Plan usage"
           tone={data.usage.full ? "warning" : "neutral"}
         />
       </div>
 
-      {data.usage.nearLimit && (
-        <Panel className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="kicker text-warning">Upgrade recommended</div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Free plan usage is {data.usage.used} / {data.usage.limit} bookings this month.
-            </p>
-          </div>
-          <Link to="/dashboard/settings" className="btn-solid">
-            Upgrade
-          </Link>
-        </Panel>
-      )}
-
+      {/* Today timeline */}
       <div>
-        <div className="mb-4 flex items-center justify-between">
-          <Kicker tone="accent">Upcoming bookings</Kicker>
+        <div className="kicker mb-2.5">
+          Today — {formatDateLabel(now.toISOString(), { year: "numeric" })}
+        </div>
+        <Panel className="overflow-hidden">
+          {today.length === 0 ? (
+            <EmptyState
+              icon="📅"
+              title="No bookings today"
+              sub="Share your booking link to fill your day."
+            />
+          ) : (
+            today.map((booking, index) => (
+              <BookingRow key={booking.id} booking={booking} last={index === today.length - 1} />
+            ))
+          )}
+        </Panel>
+      </div>
+
+      {/* Upcoming */}
+      <div>
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="kicker">Upcoming bookings</span>
           <Link
             to="/dashboard/bookings"
-            className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent"
+            className="text-xs font-medium text-primary hover:underline"
           >
-            View all
+            View all →
           </Link>
         </div>
         <Panel className="overflow-hidden">
-          {nextRows.length === 0 && (
-            <div className="px-6 py-12 text-center font-display text-xs tracking-[0.25em] uppercase text-muted-foreground">
-              No upcoming bookings
-            </div>
+          {nextRows.length === 0 ? (
+            <EmptyState
+              icon="📋"
+              title="No upcoming bookings"
+              sub="New bookings appear here the moment customers confirm."
+            />
+          ) : (
+            nextRows.map((booking, index) => (
+              <BookingRow
+                key={booking.id}
+                booking={booking}
+                last={index === nextRows.length - 1}
+                showDate
+              />
+            ))
           )}
-          {nextRows.map((booking, index) => (
-            <BookingRow key={booking.id} booking={booking} last={index === nextRows.length - 1} />
-          ))}
         </Panel>
       </div>
     </div>
   );
+}
+
+function ownerFirstName(data: DashboardData) {
+  const source = data.owner?.name || data.owner?.email || "owner";
+  return source.split("@")[0].split(/\s+/)[0];
 }
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-4">
-          <div className="h-3 w-40 animate-pulse bg-muted" />
-          <div className="h-12 w-72 max-w-full animate-pulse bg-muted" />
-          <div className="h-4 w-60 max-w-full animate-pulse bg-muted" />
-        </div>
-        <div className="h-10 w-40 animate-pulse border border-border-strong bg-muted/40" />
+    <div className="space-y-5">
+      <div className="space-y-2">
+        <div className="skeleton h-7 w-64 max-w-full" />
+        <div className="skeleton h-4 w-44" />
       </div>
-      <Panel className="p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-3">
-            <div className="h-3 w-32 animate-pulse bg-muted" />
-            <div className="h-6 w-64 max-w-full animate-pulse bg-muted" />
-          </div>
-          <div className="h-10 w-28 animate-pulse border border-border-strong bg-muted/40" />
-        </div>
-      </Panel>
-      <div className="grid grid-cols-2 border border-border-strong sm:grid-cols-4">
+      <div className="skeleton h-20 w-full rounded-xl" />
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="space-y-3 border-border-strong p-5 sm:border-r">
-            <div className="h-8 w-16 animate-pulse bg-muted" />
-            <div className="h-3 w-24 animate-pulse bg-muted" />
+          <div key={item} className="skeleton h-20 rounded-xl" />
+        ))}
+      </div>
+      <div className="skeleton h-3 w-36" />
+      <div className="space-y-px overflow-hidden rounded-2xl border border-border bg-card">
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="border-b border-border/60 px-4 py-3.5 last:border-0">
+            <div className="skeleton h-10 w-full" />
           </div>
         ))}
       </div>
-      <Panel className="p-6">
-        <div className="space-y-4">
-          {[0, 1, 2].map((item) => (
-            <div key={item} className="h-14 animate-pulse border border-border bg-muted/40" />
-          ))}
-        </div>
-      </Panel>
     </div>
   );
 }
 
-function BookingRow({ booking, last }: { booking: Booking; last: boolean }) {
+function BookingRow({
+  booking,
+  last,
+  showDate = false,
+}: {
+  booking: Booking;
+  last: boolean;
+  showDate?: boolean;
+}) {
   return (
     <div
-      className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-card ${
-        last ? "" : "border-b border-border"
+      className={`flex items-center gap-3.5 px-4 py-3 transition-colors hover:bg-surface ${
+        last ? "" : "border-b border-border/70"
       }`}
     >
-      <span className="min-w-[56px] font-display text-sm tracking-[0.1em] text-accent">
-        {formatTimeLabel(booking.startAt)}
-      </span>
-      <div className="flex-1">
-        <div className="font-display text-base tracking-[0.05em] text-foreground">
-          {booking.customerName}
-        </div>
-        <div className="mt-0.5 text-xs text-muted-foreground">
-          {formatDateLabel(booking.startAt)} - {booking.serviceName ?? "Service"}
+      <div className="min-w-[52px] shrink-0">
+        {showDate && (
+          <div className="text-[11px] text-muted-foreground">
+            {formatDateLabel(booking.startAt)}
+          </div>
+        )}
+        <div className="text-[13px] font-semibold text-foreground">
+          {formatTimeLabel(booking.startAt)}
         </div>
       </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[13px] font-semibold text-foreground">
+          {booking.customerName}
+        </div>
+        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+          {booking.serviceName ?? "Service"}
+        </div>
+      </div>
+      {booking.servicePriceLabel && (
+        <span className="hidden text-xs font-medium text-foreground sm:block">
+          {booking.servicePriceLabel}
+        </span>
+      )}
       <StatusPill status={booking.status} />
     </div>
   );
 }
 
-function StatCell({
+function StatCard({
   val,
   label,
   tone,
-  border,
-  mobileBorder,
-  bottom,
 }: {
   val: string;
   label: string;
-  tone: "primary" | "neutral" | "accent" | "warning";
-  border?: string;
-  mobileBorder?: string;
-  bottom?: string;
+  tone: "primary" | "neutral" | "success" | "warning";
 }) {
-  const colorMap = {
-    primary: "text-primary",
-    neutral: "text-foreground",
-    accent: "text-accent",
-    warning: "text-warning",
+  const map = {
+    primary: "bg-primary-soft text-primary",
+    neutral: "bg-surface text-foreground",
+    success: "bg-success-soft text-success",
+    warning: "bg-warning-soft text-warning",
   } as const;
   return (
     <div
-      className={`p-5 ${mobileBorder ?? ""} ${border ?? ""} ${bottom ?? ""} border-border-strong`}
+      className={`rounded-xl border border-border px-3 py-3.5 text-center ${map[tone].split(" ")[0]}`}
     >
-      <div className={`font-display text-3xl font-light tracking-[0.04em] ${colorMap[tone]}`}>
-        {val}
-      </div>
-      <div className="mt-2 font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
-        {label}
-      </div>
+      <div className={`text-xl font-bold leading-none ${map[tone].split(" ")[1]}`}>{val}</div>
+      <div className="kicker mt-1.5 text-[10px]">{label}</div>
     </div>
-  );
-}
-
-function StatusPill({ status }: { status: Booking["status"] }) {
-  const map = {
-    confirmed: { cls: "border-success/40 bg-success-soft text-success", label: "Confirmed" },
-    pending: { cls: "border-warning/40 bg-warning-soft text-warning", label: "Pending" },
-    cancelled: {
-      cls: "border-destructive/40 bg-destructive/10 text-destructive",
-      label: "Cancelled",
-    },
-  } as const;
-  const item = map[status];
-  return (
-    <span
-      className={`border px-2.5 py-1 font-display text-[10px] tracking-[0.25em] uppercase ${item.cls}`}
-    >
-      {item.label}
-    </span>
   );
 }

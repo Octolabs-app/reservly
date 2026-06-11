@@ -1,4 +1,7 @@
 export const FREE_BOOKING_LIMIT = 15;
+export const DEFAULT_MIN_NOTICE_MINUTES = 120;
+export const DEFAULT_MAX_ADVANCE_DAYS = 30;
+export const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
 
 export type Plan = "free" | "pro" | "studio";
 export type BookingStatus = "pending" | "confirmed" | "cancelled";
@@ -22,6 +25,9 @@ export type Business = {
   timezone: string;
   plan: Plan;
   bookingLimitMonthly: number | null;
+  minNoticeMinutes: number;
+  maxAdvanceDays: number;
+  slotIntervalMinutes: number | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -33,6 +39,7 @@ export type Service = {
   durationMinutes: number;
   priceLabel: string;
   active: boolean;
+  allDay: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -95,6 +102,9 @@ export type BusinessInput = {
   city: string;
   whatsappNumber: string;
   bookingPageLanguage: BookingLanguage;
+  minNoticeMinutes?: number;
+  maxAdvanceDays?: number;
+  slotIntervalMinutes?: number | null;
 };
 
 export type ServiceInput = {
@@ -103,6 +113,7 @@ export type ServiceInput = {
   durationMinutes: number;
   priceLabel: string;
   active?: boolean;
+  allDay?: boolean;
 };
 
 export type AvailabilityInput = {
@@ -129,5 +140,5 @@ export type Slot = {
   time: string;
   startAt: string;
   available: boolean;
-  reason?: "past" | "closed" | "taken" | "full";
+  reason?: "past" | "closed" | "taken" | "full" | "notice";
 };

@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
 import { getBookingById } from "@/lib/cf/client-data";
+import { getLastBooking } from "@/lib/reservly/dev-store";
 import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
 import type { Booking } from "@/lib/reservly/types";
 
@@ -24,9 +25,15 @@ function ConfirmedPage() {
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 80);
     if (bookingId) {
+      // The booking we just created is cached in sessionStorage — show it
+      // instantly and let the API result replace it when available.
+      const last = getLastBooking();
+      if (last?.id === bookingId) setBooking(last);
       getBookingById(bookingId)
-        .then(setBooking)
-        .catch(() => setBooking(null));
+        .then((result) => {
+          if (result) setBooking(result);
+        })
+        .catch(() => {});
     }
     return () => clearTimeout(t);
   }, [bookingId]);
@@ -39,83 +46,91 @@ function ConfirmedPage() {
     ["Service", booking?.serviceName ?? "Selected service"],
     ["Date", booking ? formatDateLabel(booking.startAt, { year: "numeric" }) : "Confirmed"],
     ["Time", booking ? formatTimeLabel(booking.startAt) : "Confirmed"],
-    ["Status", booking?.status ?? "pending"],
   ];
-
   if (booking?.servicePriceLabel) rows.push(["Price", booking.servicePriceLabel]);
 
   return (
     <>
       <SiteHeader />
       <Page width="sm">
-        <div className="text-center">
-          <Kicker tone="accent">Booking confirmed</Kicker>
-        </div>
-
-        <div className="mt-10 flex justify-center">
-          <div
-            className={`relative flex h-24 w-24 items-center justify-center border border-success text-4xl text-success transition-all duration-500 ${
-              show ? "scale-100 opacity-100" : "scale-75 opacity-0"
-            }`}
-          >
-            <span className="pulse-dot">OK</span>
+        <Panel className="overflow-hidden">
+          <div className="bg-success px-5 py-3.5">
+            <span className="text-sm font-bold text-white">Booking received</span>
           </div>
-        </div>
+          <div className="px-6 pb-7 pt-9 text-center">
+            <div
+              className={`mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-full border-[2.5px] text-4xl transition-all duration-500 ${
+                show
+                  ? "scale-100 border-success bg-success-soft text-success opacity-100"
+                  : "scale-50 border-border opacity-0"
+              }`}
+              style={{ transitionTimingFunction: "cubic-bezier(.34,1.56,.64,1)" }}
+            >
+              ✓
+            </div>
 
-        <h1 className="mt-8 text-center font-serif text-4xl text-foreground sm:text-5xl">
-          You are booked in.
-        </h1>
-        <p className="mt-3 text-center text-sm text-muted-foreground">
-          See you soon at {businessName}.
-        </p>
+            <h1 className="text-[22px] font-bold tracking-tight text-foreground">You're booked!</h1>
+            <p className="mt-1 text-[13px] text-muted-foreground">See you at {businessName}.</p>
 
-        <Panel className="mt-10 p-6">
-          <div className="divide-y divide-border">
-            {rows.map(([key, value]) => (
-              <div key={key} className="flex items-center justify-between gap-4 py-3">
-                <span className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
-                  {key}
-                </span>
-                <span className="text-right font-display text-sm tracking-[0.05em] text-foreground">
-                  {value}
-                </span>
-              </div>
-            ))}
+            <div className="mt-6 rounded-xl border border-border bg-white px-4 py-1.5 text-left shadow-xs">
+              {rows.map(([key, value], index) => (
+                <div
+                  key={key}
+                  className={`flex items-center justify-between gap-4 py-2.5 ${
+                    index < rows.length - 1 ? "border-b border-border/70" : ""
+                  }`}
+                >
+                  <span className="text-[13px] text-muted-foreground">{key}</span>
+                  <span className="text-right text-[13px] font-semibold text-foreground">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-[10px] border border-wa/25 bg-wa-soft px-4 py-2.5 text-[13px] text-success">
+              <span className="text-base">💬</span>
+              <span>
+                Confirmation sent on WhatsApp
+                {booking?.customerPhone ? ` to ${booking.customerPhone}` : ""}
+              </span>
+            </div>
+
+            <div className="mt-4 rounded-lg bg-surface px-3.5 py-2.5 text-left text-xs leading-relaxed text-muted-foreground">
+              📅 Keep an eye on WhatsApp — the business will confirm your booking there. Reply{" "}
+              <strong>CANCEL</strong> if you need to cancel.
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2.5">
+              <a
+                href={
+                  booking
+                    ? `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+                        `Booking at ${businessName}`,
+                      )}&dates=${calendarDate(booking.startAt)}/${calendarDate(booking.endAt)}`
+                    : "#"
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="btn-frame"
+              >
+                Add to calendar
+              </a>
+              <Link to="/b/$slug" params={{ slug }} className="btn-frame-primary">
+                New booking
+              </Link>
+            </div>
+
+            <div className="mt-7">
+              <Link
+                to="/"
+                className="text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                Powered by Reservly →
+              </Link>
+            </div>
           </div>
         </Panel>
-
-        <div className="mt-6 flex items-center justify-center gap-2 border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">
-          <span className="font-display text-[10px] tracking-[0.3em] uppercase">
-            WhatsApp confirmation queued
-          </span>
-        </div>
-
-        <div className="mt-8 grid grid-cols-2 gap-3">
-          <a
-            href={
-              booking
-                ? `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-                    `Booking at ${businessName}`,
-                  )}&dates=${calendarDate(booking.startAt)}/${calendarDate(booking.endAt)}`
-                : "#"
-            }
-            className="btn-frame text-center"
-          >
-            Calendar
-          </a>
-          <Link to="/b/$slug" params={{ slug }} className="btn-frame-primary text-center">
-            New booking
-          </Link>
-        </div>
-
-        <div className="mt-10 text-center">
-          <Link
-            to="/"
-            className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent"
-          >
-            Back to Reservly
-          </Link>
-        </div>
       </Page>
     </>
   );

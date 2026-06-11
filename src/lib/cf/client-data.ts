@@ -1,3 +1,4 @@
+import { saveLastBooking } from "@/lib/reservly/dev-store";
 import type {
   Availability,
   AvailabilityInput,
@@ -50,11 +51,14 @@ export function getAvailableSlots(
   return api(`/api/public/slots?${params.toString()}`);
 }
 
-export function createBooking(input: BookingInput): Promise<Booking> {
-  return api("/api/public/bookings", {
+export async function createBooking(input: BookingInput): Promise<Booking> {
+  const booking = await api<Booking>("/api/public/bookings", {
     method: "POST",
     body: jsonBody(input),
   });
+  // Cache for the confirmation page (sessionStorage is client-only).
+  saveLastBooking(booking);
+  return booking;
 }
 
 export function getBookingById(id: string): Promise<Booking | null> {

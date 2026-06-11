@@ -22,6 +22,8 @@ import {
   FREE_BOOKING_LIMIT,
   type Availability,
   type AvailabilityInput,
+  DEFAULT_MAX_ADVANCE_DAYS,
+  DEFAULT_MIN_NOTICE_MINUTES,
   type Booking,
   type BookingInput,
   type Business,
@@ -56,6 +58,9 @@ function mapBusiness(row: DbRecord): Business {
     timezone: row.timezone ?? "Indian/Mauritius",
     plan: mapPlan(row.plan),
     bookingLimitMonthly: row.booking_limit_monthly ?? FREE_BOOKING_LIMIT,
+    minNoticeMinutes: row.min_notice_minutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+    maxAdvanceDays: row.max_advance_days ?? DEFAULT_MAX_ADVANCE_DAYS,
+    slotIntervalMinutes: row.slot_interval_minutes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -69,6 +74,7 @@ function mapService(row: DbRecord): Service {
     durationMinutes: row.duration_minutes,
     priceLabel: row.price_label ?? "",
     active: row.active ?? true,
+    allDay: Boolean(row.all_day),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

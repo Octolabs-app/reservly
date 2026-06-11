@@ -38,8 +38,14 @@ import {
   formatDateLabel,
   formatTimeLabel,
   generateSlots,
+  getMauritiusDayOfWeek,
+  isoFromMauritiusLocal,
+  mauritiusDateFromIso,
 } from "@/lib/reservly/slots";
 import {
+  DEFAULT_MAX_ADVANCE_DAYS,
+  DEFAULT_MIN_NOTICE_MINUTES,
+  DEFAULT_SLOT_INTERVAL_MINUTES,
   FREE_BOOKING_LIMIT,
   type Availability,
   type AvailabilityInput,
@@ -70,6 +76,9 @@ type BusinessRow = {
   timezone: string;
   plan: string;
   booking_limit_monthly: number | null;
+  min_notice_minutes: number | null;
+  max_advance_days: number | null;
+  slot_interval_minutes: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -105,6 +114,7 @@ type ServiceRow = {
   duration_minutes: number;
   price_label: string;
   active: number;
+  all_day: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -160,6 +170,9 @@ function mapBusiness(row: BusinessRow): Business {
     timezone: row.timezone ?? "Indian/Mauritius",
     plan: mapPlan(row.plan),
     bookingLimitMonthly: row.booking_limit_monthly ?? FREE_BOOKING_LIMIT,
+    minNoticeMinutes: row.min_notice_minutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+    maxAdvanceDays: row.max_advance_days ?? DEFAULT_MAX_ADVANCE_DAYS,
+    slotIntervalMinutes: row.slot_interval_minutes ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -173,6 +186,7 @@ function mapService(row: ServiceRow): Service {
     durationMinutes: row.duration_minutes,
     priceLabel: row.price_label ?? "",
     active: Boolean(row.active),
+    allDay: Boolean(row.all_day),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -236,8 +250,9 @@ export async function createBusiness(
         `
       INSERT INTO businesses
         (id, owner_id, name, slug, category, city, whatsapp_number,
-         booking_page_language, timezone, plan, booking_limit_monthly)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Indian/Mauritius', 'free', ?)
+         booking_page_language, timezone, plan, booking_limit_monthly,
+         min_notice_minutes, max_advance_days, slot_interval_minutes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Indian/Mauritius', 'free', ?, ?, ?, ?)
     `,
       )
       .bind(
@@ -250,6 +265,9 @@ export async function createBusiness(
         input.whatsappNumber.trim(),
         input.bookingPageLanguage,
         FREE_BOOKING_LIMIT,
+        input.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+        input.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
+        input.slotIntervalMinutes ?? null,
       ),
   );
 
@@ -330,6 +348,9 @@ export async function updateBusiness(
         name = COALESCE(?, name), category = COALESCE(?, category),
         city = COALESCE(?, city), whatsapp_number = COALESCE(?, whatsapp_number),
         booking_page_language = COALESCE(?, booking_page_language),
+        min_notice_minutes = COALESCE(?, min_notice_minutes),
+        max_advance_days = COALESCE(?, max_advance_days),
+        slot_interval_minutes = CASE WHEN ? = 1 THEN ? ELSE slot_interval_minutes END,
         updated_at = datetime('now')
       WHERE id = ? AND owner_id = ?
     `,
@@ -340,6 +361,10 @@ export async function updateBusiness(
         input.city ?? null,
         input.whatsappNumber ?? null,
         input.bookingPageLanguage ?? null,
+        input.minNoticeMinutes ?? null,
+        input.maxAdvanceDays ?? null,
+        "slotIntervalMinutes" in input ? 1 : 0,
+        input.slotIntervalMinutes ?? null,
         input.id,
         currentOwnerId,
       ),
@@ -373,8 +398,8 @@ export async function createService(input: ServiceInput, ownerId?: string): Prom
     db
       .prepare(
         `
-      INSERT INTO services (id, business_id, name, duration_minutes, price_label, active)
-      VALUES (?, ?, ?, ?, ?, 1)
+      INSERT INTO services (id, business_id, name, duration_minutes, price_label, active, all_day)
+      VALUES (?, ?, ?, ?, ?, 1, ?)
     `,
       )
       .bind(
@@ -383,6 +408,7 @@ export async function createService(input: ServiceInput, ownerId?: string): Prom
         input.name.trim(),
         input.durationMinutes,
         input.priceLabel.trim(),
+        input.allDay ? 1 : 0,
       ),
   );
 
@@ -411,6 +437,7 @@ export async function updateService(
         duration_minutes = COALESCE(?, duration_minutes),
         price_label = COALESCE(?, price_label),
         active = COALESCE(?, active),
+        all_day = COALESCE(?, all_day),
         updated_at = datetime('now')
       WHERE id = ?
     `,
@@ -420,6 +447,7 @@ export async function updateService(
         input.durationMinutes ?? null,
         input.priceLabel ?? null,
         input.active != null ? (input.active ? 1 : 0) : null,
+        input.allDay != null ? (input.allDay ? 1 : 0) : null,
         input.id,
       ),
   );
@@ -504,6 +532,8 @@ export async function getAvailableSlots(
       availability: devPublic?.availability ?? [],
       bookings: [],
       monthlyFull: devPublic?.usage.full ?? false,
+      stepMinutes: devPublic?.business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+      minNoticeMinutes: devPublic?.business.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
     });
   }
 
@@ -543,6 +573,8 @@ export async function getAvailableSlots(
     availability: availRows.map(mapAvailability),
     bookings,
     monthlyFull,
+    stepMinutes: business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+    minNoticeMinutes: business.minNoticeMinutes,
   });
 }
 
@@ -566,6 +598,18 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
   );
   const business = bizRow ? mapBusiness(bizRow) : null;
   if (business) {
+    // Enforce the owner's booking rules server-side.
+    const startMsCheck = new Date(input.startAt).getTime();
+    const nowMs = Date.now();
+    if (startMsCheck - nowMs < business.minNoticeMinutes * 60_000) {
+      throw new Error("This time is too soon. The business needs more notice — pick a later slot.");
+    }
+    if (startMsCheck > nowMs + business.maxAdvanceDays * 24 * 3600 * 1000) {
+      throw new Error(
+        `Bookings can only be made up to ${business.maxAdvanceDays} days in advance.`,
+      );
+    }
+
     if (business.plan === "free" && business.bookingLimitMonthly) {
       const monthStart = input.startAt.slice(0, 7) + "-01T00:00:00.000Z";
       const monthEnd =
@@ -590,7 +634,19 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
 
   // Check overlap
   const startMs = new Date(input.startAt).getTime();
-  const endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
+  let endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
+  if (service.allDay) {
+    // All-day bookings block the whole working day.
+    const bookingDate = mauritiusDateFromIso(input.startAt);
+    const dayRow = await d1First<AvailabilityRow>(
+      db
+        .prepare("SELECT * FROM availability WHERE business_id = ? AND day_of_week = ?")
+        .bind(input.businessId, getMauritiusDayOfWeek(bookingDate)),
+    );
+    if (dayRow?.closes_at) {
+      endAt = isoFromMauritiusLocal(bookingDate, dayRow.closes_at.slice(0, 5));
+    }
+  }
   const overlap = await d1First(
     db
       .prepare(
