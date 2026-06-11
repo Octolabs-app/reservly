@@ -1,125 +1,190 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { Kicker, Panel } from "@/components/reservly/AppShell";
+import { getDashboardData } from "@/lib/reservly/data";
+import { getSiteUrl } from "@/lib/reservly/env";
+import { formatDateLabel, formatTimeLabel, getBookingMonthKey } from "@/lib/reservly/slots";
+import type { Booking, DashboardData } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardHome,
 });
 
 function DashboardHome() {
+  const [data, setData] = useState<DashboardData | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const stats = [
-    { val: "4", label: "Today", tone: "primary" as const },
-    { val: "19", label: "This week", tone: "neutral" as const },
-    { val: "Rs 6.8K", label: "Revenue", tone: "accent" as const },
-    { val: "1", label: "No-shows", tone: "warning" as const },
-  ];
+  useEffect(() => {
+    getDashboardData().then(setData);
+  }, []);
 
-  const today = [
-    { time: "09:00", name: "Marie D.", service: "Haircut", status: "confirmed", price: "Rs 350" },
-    { time: "10:30", name: "Jean-Paul", service: "Colour", status: "confirmed", price: "Rs 800" },
-    { time: "13:00", name: "Sophie R.", service: "Cut + Blow", status: "pending", price: "Rs 550" },
-    { time: "15:00", name: null, service: null, status: "open", price: null },
-    { time: "16:30", name: null, service: null, status: "open", price: null },
-  ];
+  const now = new Date();
+  const todayKey = now.toISOString().slice(0, 10);
+  const monthKey = getBookingMonthKey(now.toISOString());
+  const activeBookings = data?.bookings.filter((booking) => booking.status !== "cancelled") ?? [];
+  const today = activeBookings.filter((booking) => booking.startAt.slice(0, 10) === todayKey);
+  const upcoming = activeBookings.filter(
+    (booking) => new Date(booking.startAt).getTime() >= now.getTime(),
+  );
+  const weekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const thisWeek = upcoming.filter((booking) => new Date(booking.startAt) <= weekEnd).length;
+  const monthCount = activeBookings.filter(
+    (booking) => getBookingMonthKey(booking.startAt) === monthKey,
+  ).length;
 
-  const copy = () => {
-    navigator.clipboard?.writeText("https://reservly.app/b/salon-rose").catch(() => {});
+  const bookingLink = data?.business ? `${getSiteUrl()}/b/${data.business.slug}` : "";
+  const displayUrl = data?.business ? `reservly.app/b/${data.business.slug}` : "";
+
+  const nextRows = useMemo(
+    () =>
+      upcoming
+        .slice(0, 6)
+        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
+    [upcoming],
+  );
+
+  function copy() {
+    if (!bookingLink) return;
+    navigator.clipboard?.writeText(bookingLink).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
-  };
+  }
+
+  if (!data)
+    return <Panel className="p-8 text-sm text-muted-foreground">Loading dashboard...</Panel>;
+
+  if (!data.business) {
+    return (
+      <Panel className="p-8">
+        <Kicker tone="accent">Setup needed</Kicker>
+        <h1 className="mt-4 font-serif text-4xl text-foreground">Create your booking page.</h1>
+        <Link to="/onboarding" className="btn-solid mt-6 inline-flex">
+          Start onboarding
+        </Link>
+      </Panel>
+    );
+  }
 
   return (
     <div className="space-y-10">
-      {/* Greeting */}
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <Kicker tone="muted">Wednesday · 10 June 2026</Kicker>
+          <Kicker tone="muted">{formatDateLabel(now.toISOString(), { year: "numeric" })}</Kicker>
           <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">
-            Good morning, Marie.
+            Good morning, {data.owner?.name?.split("@")[0] ?? "owner"}.
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Salon Rose &middot; 4 bookings today, 2 slots still open.
+            {data.business.name} - {today.length} bookings today, {upcoming.length} upcoming.
           </p>
         </div>
         <button onClick={copy} className={copied ? "btn-frame-primary" : "btn-frame"}>
-          {copied ? "✓ Link copied" : "Copy booking link"}
+          {copied ? "Link copied" : "Copy booking link"}
         </button>
       </div>
 
-      {/* Booking link banner */}
       <Panel className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="kicker text-accent">Your booking link</div>
           <div className="mt-2 font-display text-lg tracking-[0.05em] text-foreground">
-            reservly.app/b/salon-rose
+            {displayUrl}
           </div>
         </div>
         <a
-          href="/b/salon-rose"
+          href={`/b/${data.business.slug}`}
           target="_blank"
           rel="noreferrer"
           className="btn-frame self-start sm:self-auto"
         >
-          Preview →
+          Preview
         </a>
       </Panel>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 border border-border-strong sm:grid-cols-4">
-        {stats.map((s, i) => (
-          <StatCell
-            key={s.label}
-            {...s}
-            border={i < stats.length - 1 ? "sm:border-r" : ""}
-            mobileBorder={i % 2 === 0 ? "border-r" : ""}
-            bottom={i < 2 ? "border-b sm:border-b-0" : ""}
-          />
-        ))}
+        <StatCell
+          val={String(today.length)}
+          label="Today"
+          tone="primary"
+          border="sm:border-r"
+          mobileBorder="border-r"
+          bottom="border-b sm:border-b-0"
+        />
+        <StatCell
+          val={String(thisWeek)}
+          label="This week"
+          tone="neutral"
+          border="sm:border-r"
+          bottom="border-b sm:border-b-0"
+        />
+        <StatCell
+          val={String(monthCount)}
+          label="This month"
+          tone="accent"
+          border="sm:border-r"
+          mobileBorder="border-r"
+        />
+        <StatCell
+          val={data.usage.limit ? `${data.usage.used}/${data.usage.limit}` : "Unlimited"}
+          label="Plan usage"
+          tone={data.usage.full ? "warning" : "neutral"}
+        />
       </div>
 
-      {/* Today */}
+      {data.usage.nearLimit && (
+        <Panel className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="kicker text-warning">Upgrade recommended</div>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Free plan usage is {data.usage.used} / {data.usage.limit} bookings this month.
+            </p>
+          </div>
+          <button className="btn-solid">Upgrade</button>
+        </Panel>
+      )}
+
       <div>
         <div className="mb-4 flex items-center justify-between">
-          <Kicker tone="accent">Today · Wednesday 10 June</Kicker>
-          <button className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent">
-            + Add manual booking
-          </button>
+          <Kicker tone="accent">Upcoming bookings</Kicker>
+          <Link
+            to="/dashboard/bookings"
+            className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent"
+          >
+            View all
+          </Link>
         </div>
         <Panel className="overflow-hidden">
-          {today.map((b, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-card ${
-                i < today.length - 1 ? "border-b border-border" : ""
-              }`}
-            >
-              <span className="min-w-[56px] font-display text-sm tracking-[0.1em] text-accent">
-                {b.time}
-              </span>
-              <div className="flex-1">
-                <div
-                  className={`font-display text-base tracking-[0.05em] ${
-                    b.name ? "text-foreground" : "italic text-muted-foreground"
-                  }`}
-                >
-                  {b.name ?? "— slot open —"}
-                </div>
-                {b.service && (
-                  <div className="mt-0.5 text-xs text-muted-foreground">{b.service}</div>
-                )}
-              </div>
-              {b.price && (
-                <span className="hidden font-display text-xs tracking-[0.1em] text-muted-foreground sm:block">
-                  {b.price}
-                </span>
-              )}
-              <StatusPill status={b.status as "confirmed" | "pending" | "open"} />
+          {nextRows.length === 0 && (
+            <div className="px-6 py-12 text-center font-display text-xs tracking-[0.25em] uppercase text-muted-foreground">
+              No upcoming bookings
             </div>
+          )}
+          {nextRows.map((booking, index) => (
+            <BookingRow key={booking.id} booking={booking} last={index === nextRows.length - 1} />
           ))}
         </Panel>
       </div>
+    </div>
+  );
+}
+
+function BookingRow({ booking, last }: { booking: Booking; last: boolean }) {
+  return (
+    <div
+      className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-card ${
+        last ? "" : "border-b border-border"
+      }`}
+    >
+      <span className="min-w-[56px] font-display text-sm tracking-[0.1em] text-accent">
+        {formatTimeLabel(booking.startAt)}
+      </span>
+      <div className="flex-1">
+        <div className="font-display text-base tracking-[0.05em] text-foreground">
+          {booking.customerName}
+        </div>
+        <div className="mt-0.5 text-xs text-muted-foreground">
+          {formatDateLabel(booking.startAt)} - {booking.serviceName ?? "Service"}
+        </div>
+      </div>
+      <StatusPill status={booking.status} />
     </div>
   );
 }
@@ -146,7 +211,9 @@ function StatCell({
     warning: "text-warning",
   } as const;
   return (
-    <div className={`p-5 ${mobileBorder} ${border} ${bottom} border-border-strong`}>
+    <div
+      className={`p-5 ${mobileBorder ?? ""} ${border ?? ""} ${bottom ?? ""} border-border-strong`}
+    >
       <div className={`font-display text-3xl font-light tracking-[0.04em] ${colorMap[tone]}`}>
         {val}
       </div>
@@ -157,18 +224,21 @@ function StatCell({
   );
 }
 
-function StatusPill({ status }: { status: "confirmed" | "pending" | "open" }) {
+function StatusPill({ status }: { status: Booking["status"] }) {
   const map = {
     confirmed: { cls: "border-success/40 bg-success-soft text-success", label: "Confirmed" },
     pending: { cls: "border-warning/40 bg-warning-soft text-warning", label: "Pending" },
-    open: { cls: "border-border text-muted-foreground", label: "Open" },
+    cancelled: {
+      cls: "border-destructive/40 bg-destructive/10 text-destructive",
+      label: "Cancelled",
+    },
   } as const;
-  const s = map[status];
+  const item = map[status];
   return (
     <span
-      className={`border px-2.5 py-1 font-display text-[10px] tracking-[0.25em] uppercase ${s.cls}`}
+      className={`border px-2.5 py-1 font-display text-[10px] tracking-[0.25em] uppercase ${item.cls}`}
     >
-      {s.label}
+      {item.label}
     </span>
   );
 }

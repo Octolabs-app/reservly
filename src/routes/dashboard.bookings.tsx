@@ -1,49 +1,86 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Kicker, Panel } from "@/components/reservly/AppShell";
+import { cancelBooking, getDashboardData, markBookingConfirmed } from "@/lib/reservly/data";
+import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
+import type { Booking, BookingStatus, DashboardData } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/dashboard/bookings")({
   component: BookingsTab,
 });
 
-const ROWS = [
-  { date: "Wed 10 Jun", time: "09:00", name: "Marie D.", service: "Haircut", status: "confirmed" },
-  { date: "Wed 10 Jun", time: "10:30", name: "Jean-Paul", service: "Colour", status: "confirmed" },
-  { date: "Wed 10 Jun", time: "13:00", name: "Sophie R.", service: "Cut + Blow", status: "pending" },
-  { date: "Thu 11 Jun", time: "09:30", name: "Priya N.", service: "Blowout", status: "confirmed" },
-  { date: "Thu 11 Jun", time: "14:00", name: "Claire M.", service: "Haircut", status: "confirmed" },
-  { date: "Fri 12 Jun", time: "10:00", name: "Anisha R.", service: "Colour", status: "pending" },
-];
-
-const FILTERS = ["All", "Confirmed", "Pending"] as const;
+const FILTERS: Array<"all" | BookingStatus> = ["all", "confirmed", "pending", "cancelled"];
 
 function BookingsTab() {
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All");
-  const rows = ROWS.filter((r) => filter === "All" || r.status === filter.toLowerCase());
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  async function refresh() {
+    setData(await getDashboardData());
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (data?.bookings ?? []).filter((booking) => {
+      const matchesStatus = filter === "all" || booking.status === filter;
+      const matchesQuery =
+        !q ||
+        booking.customerName.toLowerCase().includes(q) ||
+        booking.customerPhone.toLowerCase().includes(q) ||
+        (booking.serviceName ?? "").toLowerCase().includes(q);
+      return matchesStatus && matchesQuery;
+    });
+  }, [data, filter, query]);
+
+  async function act(booking: Booking, action: "cancel" | "confirm") {
+    setBusyId(booking.id);
+    try {
+      if (action === "cancel") await cancelBooking(booking.id);
+      else await markBookingConfirmed(booking.id);
+      await refresh();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (!data)
+    return <Panel className="p-8 text-sm text-muted-foreground">Loading bookings...</Panel>;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <Kicker>Upcoming · Next 7 days</Kicker>
-          <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">
-            All bookings
-          </h1>
+          <Kicker>Bookings</Kicker>
+          <h1 className="mt-4 font-serif text-4xl text-foreground sm:text-5xl">All bookings</h1>
         </div>
-        <div className="flex gap-1 border border-border-strong p-1">
-          {FILTERS.map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 font-display text-[10px] tracking-[0.25em] uppercase transition-colors ${
-                filter === f
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="flex flex-col gap-3 sm:items-end">
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search name, phone, service"
+            className="w-full border border-border-strong bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-accent focus:outline-none sm:w-72"
+          />
+          <div className="flex gap-1 border border-border-strong p-1">
+            {FILTERS.map((item) => (
+              <button
+                key={item}
+                onClick={() => setFilter(item)}
+                className={`px-3 py-1.5 font-display text-[10px] tracking-[0.25em] uppercase transition-colors ${
+                  filter === item
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -53,42 +90,69 @@ function BookingsTab() {
             No bookings match
           </div>
         )}
-        {rows.map((b, i) => (
+        {rows.map((booking, index) => (
           <div
-            key={i}
-            className={`flex items-center gap-4 px-5 py-4 transition-colors hover:bg-card ${
-              i < rows.length - 1 ? "border-b border-border" : ""
+            key={booking.id}
+            className={`flex flex-col gap-4 px-5 py-4 transition-colors hover:bg-card sm:flex-row sm:items-center ${
+              index < rows.length - 1 ? "border-b border-border" : ""
             }`}
           >
-            <div className="min-w-[88px]">
+            <div className="min-w-[120px]">
               <div className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground">
-                {b.date}
+                {formatDateLabel(booking.startAt)}
               </div>
               <div className="mt-0.5 font-display text-base tracking-[0.05em] text-accent">
-                {b.time}
+                {formatTimeLabel(booking.startAt)}
               </div>
             </div>
             <div className="flex-1">
               <div className="font-display text-base tracking-[0.05em] text-foreground">
-                {b.name}
+                {booking.customerName}
               </div>
-              <div className="text-xs text-muted-foreground">{b.service}</div>
+              <div className="text-xs text-muted-foreground">
+                {booking.customerPhone} - {booking.serviceName ?? "Service"}
+              </div>
             </div>
-            <span
-              className={`border px-2.5 py-1 font-display text-[10px] tracking-[0.25em] uppercase ${
-                b.status === "confirmed"
-                  ? "border-success/40 bg-success-soft text-success"
-                  : "border-warning/40 bg-warning-soft text-warning"
-              }`}
-            >
-              {b.status}
-            </span>
-            <button className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground hover:text-destructive">
-              Cancel
-            </button>
+            <Status status={booking.status} />
+            <div className="flex gap-2">
+              {booking.status === "pending" && (
+                <button
+                  disabled={busyId === booking.id}
+                  onClick={() => void act(booking, "confirm")}
+                  className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground hover:text-success"
+                >
+                  Confirm
+                </button>
+              )}
+              {booking.status !== "cancelled" && (
+                <button
+                  disabled={busyId === booking.id}
+                  onClick={() => void act(booking, "cancel")}
+                  className="font-display text-[10px] tracking-[0.25em] uppercase text-muted-foreground hover:text-destructive"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </Panel>
     </div>
+  );
+}
+
+function Status({ status }: { status: BookingStatus }) {
+  const cls =
+    status === "confirmed"
+      ? "border-success/40 bg-success-soft text-success"
+      : status === "pending"
+        ? "border-warning/40 bg-warning-soft text-warning"
+        : "border-destructive/40 bg-destructive/10 text-destructive";
+  return (
+    <span
+      className={`w-fit border px-2.5 py-1 font-display text-[10px] tracking-[0.25em] uppercase ${cls}`}
+    >
+      {status}
+    </span>
   );
 }

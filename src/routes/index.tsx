@@ -39,18 +39,15 @@ function Landing() {
             </h1>
 
             <p className="mx-auto mt-8 max-w-2xl font-serif text-xl text-muted-foreground sm:text-2xl">
-              A quiet booking tool for island businesses where WhatsApp is already the operating system &mdash; five-minute setup, zero apps to install, bookings that just appear.
+              A quiet booking tool for island businesses where WhatsApp is already the operating
+              system &mdash; five-minute setup, zero apps to install, bookings that just appear.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
               <Link to="/onboarding" className="btn-frame-primary">
                 Get started
               </Link>
-              <Link
-                to="/b/$slug"
-                params={{ slug: "salon-rose" }}
-                className="btn-frame"
-              >
+              <Link to="/b/$slug" params={{ slug: "salon-rose" }} className="btn-frame">
                 See a booking page
               </Link>
             </div>
@@ -95,15 +92,26 @@ function Landing() {
                 A complete loop, end to end.
               </h2>
               <p className="mt-4 max-w-xl text-sm text-muted-foreground">
-                Owner sets up. Customer books. Confirmation flies. Owner manages. Open any panel to walk it.
+                Owner sets up. Customer books. Confirmation flies. Owner manages. Open any panel to
+                walk it.
               </p>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                { n: "01", title: "Onboarding", desc: "Business, services, hours.", to: "/onboarding" },
+                {
+                  n: "01",
+                  title: "Onboarding",
+                  desc: "Business, services, hours.",
+                  to: "/onboarding",
+                },
                 { n: "02", title: "Booking", desc: "Pick. Tap. Done.", to: "/b/salon-rose" },
-                { n: "03", title: "Confirmation", desc: "WhatsApp ping arrives.", to: "/b/salon-rose/confirmed" },
+                {
+                  n: "03",
+                  title: "Confirmation",
+                  desc: "WhatsApp ping arrives.",
+                  to: "/b/salon-rose/confirmed",
+                },
                 { n: "04", title: "Dashboard", desc: "Manage the day.", to: "/dashboard" },
               ].map((s) => (
                 <a key={s.n} href={s.to} className="group">

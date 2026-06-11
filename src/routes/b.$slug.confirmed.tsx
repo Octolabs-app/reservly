@@ -1,41 +1,55 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { getBookingById } from "@/lib/reservly/data";
+import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
+import type { Booking } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/b/$slug/confirmed")({
   head: () => ({
-    meta: [
-      { title: "Booking confirmed — Reservly" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Booking confirmed - Reservly" }, { name: "robots", content: "noindex" }],
   }),
   component: ConfirmedPage,
 });
 
 function ConfirmedPage() {
   const { slug } = Route.useParams();
-  const bizName = slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
-
+  const [booking, setBooking] = useState<Booking | null>(null);
   const [show, setShow] = useState(false);
+  const bookingId =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("bookingId")
+      : null;
+
   useEffect(() => {
     const t = setTimeout(() => setShow(true), 80);
+    if (bookingId) {
+      getBookingById(bookingId)
+        .then(setBooking)
+        .catch(() => setBooking(null));
+    }
     return () => clearTimeout(t);
-  }, []);
+  }, [bookingId]);
 
+  const businessName =
+    booking?.businessName ??
+    slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
   const rows: Array<[string, string]> = [
-    ["Business", bizName],
-    ["Service", "Haircut · 45 min"],
-    ["Date", "Wed 10 June 2026"],
-    ["Time", "10:30 AM"],
-    ["Price", "Rs 350"],
+    ["Business", businessName],
+    ["Service", booking?.serviceName ?? "Selected service"],
+    ["Date", booking ? formatDateLabel(booking.startAt, { year: "numeric" }) : "Confirmed"],
+    ["Time", booking ? formatTimeLabel(booking.startAt) : "Confirmed"],
+    ["Status", booking?.status ?? "pending"],
   ];
+
+  if (booking?.servicePriceLabel) rows.push(["Price", booking.servicePriceLabel]);
 
   return (
     <>
       <SiteHeader />
       <Page width="sm">
         <div className="text-center">
-          <Kicker tone="accent">Booking Confirmed</Kicker>
+          <Kicker tone="accent">Booking confirmed</Kicker>
         </div>
 
         <div className="mt-10 flex justify-center">
@@ -44,26 +58,26 @@ function ConfirmedPage() {
               show ? "scale-100 opacity-100" : "scale-75 opacity-0"
             }`}
           >
-            <span className="pulse-dot">✓</span>
+            <span className="pulse-dot">OK</span>
           </div>
         </div>
 
         <h1 className="mt-8 text-center font-serif text-4xl text-foreground sm:text-5xl">
-          You're booked in.
+          You are booked in.
         </h1>
         <p className="mt-3 text-center text-sm text-muted-foreground">
-          See you soon at {bizName}.
+          See you soon at {businessName}.
         </p>
 
         <Panel className="mt-10 p-6">
           <div className="divide-y divide-border">
-            {rows.map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between py-3">
+            {rows.map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between gap-4 py-3">
                 <span className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground">
-                  {k}
+                  {key}
                 </span>
-                <span className="font-display text-sm tracking-[0.05em] text-foreground">
-                  {v}
+                <span className="text-right font-display text-sm tracking-[0.05em] text-foreground">
+                  {value}
                 </span>
               </div>
             ))}
@@ -72,13 +86,24 @@ function ConfirmedPage() {
 
         <div className="mt-6 flex items-center justify-center gap-2 border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">
           <span className="font-display text-[10px] tracking-[0.3em] uppercase">
-            ✓ WhatsApp confirmation sent
+            WhatsApp confirmation queued
           </span>
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-3">
-          <button className="btn-frame">Add to calendar</button>
-          <Link to="/b/$slug" params={{ slug }} className="btn-frame-primary">
+          <a
+            href={
+              booking
+                ? `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+                    `Booking at ${businessName}`,
+                  )}&dates=${calendarDate(booking.startAt)}/${calendarDate(booking.endAt)}`
+                : "#"
+            }
+            className="btn-frame text-center"
+          >
+            Calendar
+          </a>
+          <Link to="/b/$slug" params={{ slug }} className="btn-frame-primary text-center">
             New booking
           </Link>
         </div>
@@ -88,10 +113,14 @@ function ConfirmedPage() {
             to="/"
             className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent"
           >
-            ← Back to Reservly
+            Back to Reservly
           </Link>
         </div>
       </Page>
     </>
   );
+}
+
+function calendarDate(iso: string) {
+  return iso.replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 }

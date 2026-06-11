@@ -1,23 +1,40 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Brand } from "@/components/reservly/AppShell";
+import { getCurrentOwner, signOutOwner } from "@/lib/reservly/auth";
+import type { Owner } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
-    meta: [
-      { title: "Dashboard — Reservly" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Dashboard — Reservly" }, { name: "robots", content: "noindex" }],
   }),
   component: DashboardLayout,
 });
 
 function DashboardLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [owner, setOwner] = useState<Owner | null | undefined>(undefined);
   const tabs = [
     { id: "home", label: "Today", to: "/dashboard" as const },
     { id: "bookings", label: "Bookings", to: "/dashboard/bookings" as const },
     { id: "settings", label: "Settings", to: "/dashboard/settings" as const },
   ];
+
+  useEffect(() => {
+    getCurrentOwner().then((currentOwner) => {
+      setOwner(currentOwner);
+      if (!currentOwner) window.location.href = "/auth?redirectTo=/dashboard";
+    });
+  }, []);
+
+  async function signOut() {
+    await signOutOwner();
+    window.location.href = "/";
+  }
+
+  if (owner === undefined) {
+    return <div className="min-h-screen grid-bg-sm" />;
+  }
 
   return (
     <div className="min-h-screen grid-bg-sm">
@@ -51,8 +68,14 @@ function DashboardLayout() {
             >
               View site
             </Link>
+            <button
+              onClick={signOut}
+              className="hidden font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent sm:block"
+            >
+              Sign out
+            </button>
             <div className="flex h-8 w-8 items-center justify-center border border-accent/40 font-display text-[11px] tracking-wider text-accent">
-              MR
+              {initials(owner?.email ?? owner?.name ?? "RO")}
             </div>
           </div>
         </div>
@@ -63,4 +86,10 @@ function DashboardLayout() {
       </main>
     </div>
   );
+}
+
+function initials(value: string) {
+  const clean = value.replace(/@.*/, "").replace(/[^a-zA-Z ]/g, " ");
+  const parts = clean.trim().split(/\s+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "R").concat(parts[1]?.[0] ?? "O").toUpperCase();
 }

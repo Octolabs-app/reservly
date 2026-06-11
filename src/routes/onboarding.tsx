@@ -1,11 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { getCurrentOwner } from "@/lib/reservly/auth";
+import { createBusiness, createService, updateAvailability } from "@/lib/reservly/data";
+import type { BookingLanguage } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Set up your business — Reservly" },
+      { title: "Set up your business - Reservly" },
       {
         name: "description",
         content:
@@ -17,60 +20,144 @@ export const Route = createFileRoute("/onboarding")({
 });
 
 const CATEGORIES = ["Beauty", "Health", "Fitness", "Tutor", "Home", "Hospitality", "Other"];
-const LANGS = ["English", "Français", "Both"];
-const DURATIONS = ["15", "30", "45", "60", "90", "120"];
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const LANGS: BookingLanguage[] = ["English", "Francais", "Both"];
+const DURATIONS = [15, 30, 45, 60, 90, 120];
+const DAYS = [
+  { label: "Mon", dayOfWeek: 1 },
+  { label: "Tue", dayOfWeek: 2 },
+  { label: "Wed", dayOfWeek: 3 },
+  { label: "Thu", dayOfWeek: 4 },
+  { label: "Fri", dayOfWeek: 5 },
+  { label: "Sat", dayOfWeek: 6 },
+  { label: "Sun", dayOfWeek: 0 },
+];
 
-type Service = { name: string; duration: string; price: string };
-type Hour = { day: string; open: boolean; from: string; to: string };
+type ServiceDraft = { name: string; durationMinutes: number; priceLabel: string };
+type HourDraft = {
+  label: string;
+  dayOfWeek: number;
+  isOpen: boolean;
+  opensAt: string;
+  closesAt: string;
+};
 
 function OnboardingPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
-  const [biz, setBiz] = useState({ name: "", category: "", city: "", lang: "Both" });
-  const [services, setServices] = useState<Service[]>([{ name: "", duration: "45", price: "" }]);
-  const [hours, setHours] = useState<Hour[]>(
-    DAYS.map((d, i) => ({ day: d, open: i < 6, from: "09:00", to: "18:00" })),
+  const [checkingAuth, setCheckingAuth] = useState(true);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [biz, setBiz] = useState({
+    name: "",
+    category: "",
+    city: "",
+    whatsappNumber: "+230",
+    lang: "Both" as BookingLanguage,
+  });
+  const [services, setServices] = useState<ServiceDraft[]>([
+    { name: "", durationMinutes: 45, priceLabel: "" },
+  ]);
+  const [hours, setHours] = useState<HourDraft[]>(
+    DAYS.map((day) => ({
+      ...day,
+      isOpen: day.dayOfWeek !== 0,
+      opensAt: "09:00",
+      closesAt: day.dayOfWeek === 6 ? "15:00" : "18:00",
+    })),
   );
 
+  useEffect(() => {
+    getCurrentOwner()
+      .then((owner) => setNeedsAuth(!owner))
+      .finally(() => setCheckingAuth(false));
+  }, []);
+
   const stepNames = ["Business", "Services", "Hours"];
-  const canNext1 = biz.name && biz.category;
-  const canNext2 = services[0].name;
+  const validServices = services.filter((service) => service.name.trim());
+  const canNext1 = biz.name.trim() && biz.category;
+  const canNext2 = validServices.length > 0;
+
+  async function finish() {
+    const owner = await getCurrentOwner();
+    if (!owner) {
+      window.location.href = "/auth?redirectTo=/onboarding";
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const business = await createBusiness({
+        name: biz.name,
+        category: biz.category,
+        city: biz.city,
+        whatsappNumber: biz.whatsappNumber,
+        bookingPageLanguage: biz.lang,
+      });
+
+      await Promise.all(
+        validServices.map((service) =>
+          createService({
+            businessId: business.id,
+            name: service.name,
+            durationMinutes: service.durationMinutes,
+            priceLabel: service.priceLabel,
+          }),
+        ),
+      );
+
+      await updateAvailability({
+        businessId: business.id,
+        days: hours.map((hour) => ({
+          dayOfWeek: hour.dayOfWeek,
+          isOpen: hour.isOpen,
+          opensAt: hour.opensAt,
+          closesAt: hour.closesAt,
+        })),
+      });
+
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Onboarding failed.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!checkingAuth && needsAuth) {
+    window.location.href = "/auth?redirectTo=/onboarding";
+    return null;
+  }
 
   return (
     <>
       <SiteHeader />
       <Page width="md">
         <div className="mb-8 flex items-center justify-between">
-          <Kicker tone="accent">Setup &middot; Step {step} of 3</Kicker>
-          <Link to="/" className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent">
-            &larr; Cancel
+          <Kicker tone="accent">Setup - Step {step} of 3</Kicker>
+          <Link
+            to="/"
+            className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent"
+          >
+            Cancel
           </Link>
         </div>
 
-        {/* Progress rail */}
         <div className="mb-10 grid grid-cols-3 gap-2">
-          {stepNames.map((s, i) => {
-            const idx = i + 1;
+          {stepNames.map((name, index) => {
+            const idx = index + 1;
             const active = idx === step;
             const done = idx < step;
             return (
-              <button
-                key={s}
-                onClick={() => idx < step && setStep(idx)}
-                className="text-left"
-              >
-                <div
-                  className={`h-px ${
-                    active || done ? "bg-accent" : "bg-border-strong"
-                  }`}
-                />
+              <button key={name} onClick={() => done && setStep(idx)} className="text-left">
+                <div className={`h-px ${active || done ? "bg-accent" : "bg-border-strong"}`} />
                 <div
                   className={`mt-3 font-display text-[10px] tracking-[0.3em] uppercase ${
                     active ? "text-accent" : done ? "text-foreground" : "text-muted-foreground"
                   }`}
                 >
-                  0{idx} &middot; {s}
+                  0{idx} - {name}
                 </div>
               </button>
             );
@@ -83,15 +170,15 @@ function OnboardingPage() {
               <header>
                 <h1 className="font-serif text-3xl text-foreground">Tell us about your business</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  This is what your customers see on the booking page.
+                  This is what customers see on your booking page.
                 </p>
               </header>
 
               <Field label="Business name">
                 <input
                   value={biz.name}
-                  onChange={(e) => setBiz({ ...biz, name: e.target.value })}
-                  placeholder="e.g. Salon Rose"
+                  onChange={(event) => setBiz({ ...biz, name: event.target.value })}
+                  placeholder="Salon Rose"
                   className="w-full bg-transparent py-3 text-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
                 />
               </Field>
@@ -99,13 +186,13 @@ function OnboardingPage() {
               <div>
                 <Label>Category</Label>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {CATEGORIES.map((c) => (
+                  {CATEGORIES.map((category) => (
                     <Chip
-                      key={c}
-                      active={biz.category === c}
-                      onClick={() => setBiz({ ...biz, category: c })}
+                      key={category}
+                      active={biz.category === category}
+                      onClick={() => setBiz({ ...biz, category })}
                     >
-                      {c}
+                      {category}
                     </Chip>
                   ))}
                 </div>
@@ -114,8 +201,17 @@ function OnboardingPage() {
               <Field label="City">
                 <input
                   value={biz.city}
-                  onChange={(e) => setBiz({ ...biz, city: e.target.value })}
-                  placeholder="Port Louis, Quatre Bornes…"
+                  onChange={(event) => setBiz({ ...biz, city: event.target.value })}
+                  placeholder="Port Louis"
+                  className="w-full bg-transparent py-3 text-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                />
+              </Field>
+
+              <Field label="WhatsApp number">
+                <input
+                  value={biz.whatsappNumber}
+                  onChange={(event) => setBiz({ ...biz, whatsappNumber: event.target.value })}
+                  placeholder="+23057000000"
                   className="w-full bg-transparent py-3 text-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
                 />
               </Field>
@@ -123,14 +219,14 @@ function OnboardingPage() {
               <div>
                 <Label>Booking page language</Label>
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  {LANGS.map((l) => (
+                  {LANGS.map((lang) => (
                     <Chip
-                      key={l}
-                      active={biz.lang === l}
-                      onClick={() => setBiz({ ...biz, lang: l })}
+                      key={lang}
+                      active={biz.lang === lang}
+                      onClick={() => setBiz({ ...biz, lang })}
                       full
                     >
-                      {l}
+                      {lang}
                     </Chip>
                   ))}
                 </div>
@@ -143,18 +239,18 @@ function OnboardingPage() {
               <header>
                 <h1 className="font-serif text-3xl text-foreground">Add your services</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Free plan supports one service. Pro unlocks up to five.
+                  Each service gets real duration-aware booking slots.
                 </p>
               </header>
 
               <div className="space-y-4">
-                {services.map((s, i) => (
-                  <div key={i} className="border border-border-strong p-5">
+                {services.map((service, index) => (
+                  <div key={index} className="border border-border-strong p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <span className="kicker">Service {i + 1}</span>
+                      <span className="kicker">Service {index + 1}</span>
                       {services.length > 1 && (
                         <button
-                          onClick={() => setServices(services.filter((_, idx) => idx !== i))}
+                          onClick={() => setServices(services.filter((_, idx) => idx !== index))}
                           className="font-display text-[10px] tracking-[0.3em] uppercase text-muted-foreground hover:text-destructive"
                         >
                           Remove
@@ -163,13 +259,13 @@ function OnboardingPage() {
                     </div>
                     <Field label="Name">
                       <input
-                        value={s.name}
-                        onChange={(e) => {
-                          const n = [...services];
-                          n[i] = { ...n[i], name: e.target.value };
-                          setServices(n);
+                        value={service.name}
+                        onChange={(event) => {
+                          const next = [...services];
+                          next[index] = { ...next[index], name: event.target.value };
+                          setServices(next);
                         }}
-                        placeholder="e.g. Haircut, Physio session"
+                        placeholder="Haircut"
                         className="w-full bg-transparent py-2.5 text-base text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
                       />
                     </Field>
@@ -177,29 +273,29 @@ function OnboardingPage() {
                       <div>
                         <Label>Duration</Label>
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                          {DURATIONS.map((d) => (
+                          {DURATIONS.map((duration) => (
                             <Chip
-                              key={d}
+                              key={duration}
                               size="sm"
-                              active={s.duration === d}
+                              active={service.durationMinutes === duration}
                               onClick={() => {
-                                const n = [...services];
-                                n[i] = { ...n[i], duration: d };
-                                setServices(n);
+                                const next = [...services];
+                                next[index] = { ...next[index], durationMinutes: duration };
+                                setServices(next);
                               }}
                             >
-                              {d}m
+                              {duration}m
                             </Chip>
                           ))}
                         </div>
                       </div>
-                      <Field label="Price (opt.)">
+                      <Field label="Price">
                         <input
-                          value={s.price}
-                          onChange={(e) => {
-                            const n = [...services];
-                            n[i] = { ...n[i], price: e.target.value };
-                            setServices(n);
+                          value={service.priceLabel}
+                          onChange={(event) => {
+                            const next = [...services];
+                            next[index] = { ...next[index], priceLabel: event.target.value };
+                            setServices(next);
                           }}
                           placeholder="Rs 350"
                           className="w-full bg-transparent py-2.5 text-base text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
@@ -213,11 +309,11 @@ function OnboardingPage() {
               {services.length < 5 && (
                 <button
                   onClick={() =>
-                    setServices([...services, { name: "", duration: "45", price: "" }])
+                    setServices([...services, { name: "", durationMinutes: 45, priceLabel: "" }])
                   }
                   className="btn-frame w-full"
                 >
-                  + Add another service
+                  Add another service
                 </button>
               )}
             </div>
@@ -228,47 +324,47 @@ function OnboardingPage() {
               <header>
                 <h1 className="font-serif text-3xl text-foreground">Set your opening hours</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Toggle days on or off, and set your daily window.
+                  These hours drive the public booking slots.
                 </p>
               </header>
 
               <div className="divide-y divide-border border border-border-strong">
-                {hours.map((h, i) => (
-                  <div key={h.day} className="flex items-center gap-4 px-5 py-4">
+                {hours.map((hour, index) => (
+                  <div key={hour.dayOfWeek} className="flex items-center gap-4 px-5 py-4">
                     <Toggle
-                      on={h.open}
+                      on={hour.isOpen}
                       onChange={() => {
-                        const n = [...hours];
-                        n[i] = { ...n[i], open: !n[i].open };
-                        setHours(n);
+                        const next = [...hours];
+                        next[index] = { ...next[index], isOpen: !next[index].isOpen };
+                        setHours(next);
                       }}
                     />
                     <span
                       className={`min-w-[60px] font-display text-sm tracking-[0.15em] uppercase ${
-                        h.open ? "text-foreground" : "text-muted-foreground"
+                        hour.isOpen ? "text-foreground" : "text-muted-foreground"
                       }`}
                     >
-                      {h.day}
+                      {hour.label}
                     </span>
-                    {h.open ? (
+                    {hour.isOpen ? (
                       <div className="ml-auto flex items-center gap-2">
                         <TimeSelect
-                          value={h.from}
+                          value={hour.opensAt}
                           options={["07:00", "08:00", "09:00", "10:00", "11:00"]}
-                          onChange={(v) => {
-                            const n = [...hours];
-                            n[i] = { ...n[i], from: v };
-                            setHours(n);
+                          onChange={(value) => {
+                            const next = [...hours];
+                            next[index] = { ...next[index], opensAt: value };
+                            setHours(next);
                           }}
                         />
-                        <span className="text-muted-foreground">&ndash;</span>
+                        <span className="text-muted-foreground">to</span>
                         <TimeSelect
-                          value={h.to}
-                          options={["16:00", "17:00", "18:00", "19:00", "20:00"]}
-                          onChange={(v) => {
-                            const n = [...hours];
-                            n[i] = { ...n[i], to: v };
-                            setHours(n);
+                          value={hour.closesAt}
+                          options={["15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]}
+                          onChange={(value) => {
+                            const next = [...hours];
+                            next[index] = { ...next[index], closesAt: value };
+                            setHours(next);
                           }}
                         />
                       </div>
@@ -283,24 +379,29 @@ function OnboardingPage() {
             </div>
           )}
 
-          {/* Footer nav */}
+          {error && (
+            <div className="mt-6 border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
           <div className="mt-10 flex items-center justify-between border-t border-border pt-6">
             {step > 1 ? (
               <button onClick={() => setStep(step - 1)} className="btn-frame">
-                &larr; Back
+                Back
               </button>
             ) : (
               <span />
             )}
             <button
-              disabled={step === 1 ? !canNext1 : step === 2 ? !canNext2 : false}
+              disabled={submitting || (step === 1 ? !canNext1 : step === 2 ? !canNext2 : false)}
               onClick={() => {
                 if (step < 3) setStep(step + 1);
-                else navigate({ to: "/dashboard" });
+                else void finish();
               }}
               className="btn-solid"
             >
-              {step === 3 ? "Open dashboard" : "Continue"} &rarr;
+              {submitting ? "Saving..." : step === 3 ? "Open dashboard" : "Continue"}
             </button>
           </div>
         </Panel>
@@ -309,17 +410,16 @@ function OnboardingPage() {
   );
 }
 
-/* ─── Local primitives ─────────────────────────────────────────────── */
 function Label({ children }: { children: React.ReactNode }) {
   return <div className="kicker">{children}</div>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="border-b border-border-strong">
+    <label className="block border-b border-border-strong">
       <Label>{label}</Label>
       {children}
-    </div>
+    </label>
   );
 }
 
@@ -339,6 +439,7 @@ function Chip({
   const pad = size === "sm" ? "px-2.5 py-1.5 text-[11px]" : "px-3.5 py-2 text-xs";
   return (
     <button
+      type="button"
       onClick={onClick}
       className={`font-display tracking-[0.18em] uppercase transition-all ${pad} ${
         full ? "w-full" : ""
@@ -356,10 +457,9 @@ function Chip({
 function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
   return (
     <button
+      type="button"
       onClick={onChange}
-      className={`relative h-5 w-9 rounded-full transition-colors ${
-        on ? "bg-primary" : "bg-muted"
-      }`}
+      className={`relative h-5 w-9 rounded-full transition-colors ${on ? "bg-primary" : "bg-muted"}`}
     >
       <span
         className={`absolute top-0.5 h-4 w-4 rounded-full bg-foreground shadow-sm transition-all ${
@@ -377,17 +477,17 @@ function TimeSelect({
 }: {
   value: string;
   options: string[];
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
 }) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(event) => onChange(event.target.value)}
       className="border border-border-strong bg-card px-2 py-1 font-display text-xs tracking-[0.1em] text-foreground focus:border-accent focus:outline-none"
     >
-      {options.map((o) => (
-        <option key={o} value={o} className="bg-card">
-          {o}
+      {options.map((option) => (
+        <option key={option} value={option} className="bg-card">
+          {option}
         </option>
       ))}
     </select>

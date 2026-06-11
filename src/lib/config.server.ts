@@ -19,8 +19,16 @@ import process from "node:process";
 export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
-    // Add server-only values here, e.g.:
-    //   databaseUrl: process.env.DATABASE_URL,
-    //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID,
+    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN,
+    twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM,
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    stripePriceProMonthly: process.env.STRIPE_PRICE_PRO_MONTHLY,
+    stripePriceStudioMonthly: process.env.STRIPE_PRICE_STUDIO_MONTHLY,
+    siteUrl: process.env.SITE_URL ?? process.env.VITE_SITE_URL ?? "http://localhost:5173",
   };
 }
