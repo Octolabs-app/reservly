@@ -19,10 +19,24 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardBookingsRouteImport } from './routes/dashboard.bookings'
 import { Route as BSlugRouteImport } from './routes/b.$slug'
-import { Route as BSlugConfirmedRouteImport } from './routes/b.$slug.confirmed'
+import { Route as ApiAuthRouteImport } from './routes/api.auth'
+import { Route as BSlugConfirmedRouteImport } from './routes/b.$slug_.confirmed'
 import { Route as ApiTwilioInboundRouteImport } from './routes/api.twilio.inbound'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe.webhook'
 import { Route as ApiStripeCheckoutRouteImport } from './routes/api.stripe.checkout'
+import { Route as ApiPublicSlotsRouteImport } from './routes/api.public.slots'
+import { Route as ApiPublicBusinessRouteImport } from './routes/api.public.business'
+import { Route as ApiPublicBookingsRouteImport } from './routes/api.public.bookings'
+import { Route as ApiPublicBookingRouteImport } from './routes/api.public.booking'
+import { Route as ApiDashboardServiceRouteImport } from './routes/api.dashboard.service'
+import { Route as ApiDashboardDataRouteImport } from './routes/api.dashboard.data'
+import { Route as ApiDashboardBusinessRouteImport } from './routes/api.dashboard.business'
+import { Route as ApiDashboardBookingActionRouteImport } from './routes/api.dashboard.booking-action'
+import { Route as ApiDashboardAvailabilityRouteImport } from './routes/api.dashboard.availability'
+import { Route as ApiAuthSignupRouteImport } from './routes/api.auth.signup'
+import { Route as ApiAuthSignoutRouteImport } from './routes/api.auth.signout'
+import { Route as ApiAuthSigninRouteImport } from './routes/api.auth.signin'
+import { Route as ApiAuthMeRouteImport } from './routes/api.auth.me'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -74,10 +88,15 @@ const BSlugRoute = BSlugRouteImport.update({
   path: '/b/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthRoute = ApiAuthRouteImport.update({
+  id: '/api/auth',
+  path: '/api/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BSlugConfirmedRoute = BSlugConfirmedRouteImport.update({
-  id: '/confirmed',
-  path: '/confirmed',
-  getParentRoute: () => BSlugRoute,
+  id: '/b/$slug_/confirmed',
+  path: '/b/$slug/confirmed',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTwilioInboundRoute = ApiTwilioInboundRouteImport.update({
   id: '/api/twilio/inbound',
@@ -94,6 +113,73 @@ const ApiStripeCheckoutRoute = ApiStripeCheckoutRouteImport.update({
   path: '/api/stripe/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSlotsRoute = ApiPublicSlotsRouteImport.update({
+  id: '/api/public/slots',
+  path: '/api/public/slots',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBusinessRoute = ApiPublicBusinessRouteImport.update({
+  id: '/api/public/business',
+  path: '/api/public/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBookingsRoute = ApiPublicBookingsRouteImport.update({
+  id: '/api/public/bookings',
+  path: '/api/public/bookings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBookingRoute = ApiPublicBookingRouteImport.update({
+  id: '/api/public/booking',
+  path: '/api/public/booking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardServiceRoute = ApiDashboardServiceRouteImport.update({
+  id: '/api/dashboard/service',
+  path: '/api/dashboard/service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardDataRoute = ApiDashboardDataRouteImport.update({
+  id: '/api/dashboard/data',
+  path: '/api/dashboard/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardBusinessRoute = ApiDashboardBusinessRouteImport.update({
+  id: '/api/dashboard/business',
+  path: '/api/dashboard/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardBookingActionRoute =
+  ApiDashboardBookingActionRouteImport.update({
+    id: '/api/dashboard/booking-action',
+    path: '/api/dashboard/booking-action',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiDashboardAvailabilityRoute =
+  ApiDashboardAvailabilityRouteImport.update({
+    id: '/api/dashboard/availability',
+    path: '/api/dashboard/availability',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAuthSignupRoute = ApiAuthSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthSignoutRoute = ApiAuthSignoutRouteImport.update({
+  id: '/signout',
+  path: '/signout',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthSigninRoute = ApiAuthSigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
+  id: '/me',
+  path: '/me',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -102,10 +188,24 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/b/$slug': typeof BSlugRouteWithChildren
+  '/api/auth': typeof ApiAuthRouteWithChildren
+  '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
+  '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
+  '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/data': typeof ApiDashboardDataRoute
+  '/api/dashboard/service': typeof ApiDashboardServiceRoute
+  '/api/public/booking': typeof ApiPublicBookingRoute
+  '/api/public/bookings': typeof ApiPublicBookingsRoute
+  '/api/public/business': typeof ApiPublicBusinessRoute
+  '/api/public/slots': typeof ApiPublicSlotsRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
@@ -117,10 +217,24 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/b/$slug': typeof BSlugRouteWithChildren
+  '/api/auth': typeof ApiAuthRouteWithChildren
+  '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
+  '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
+  '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/data': typeof ApiDashboardDataRoute
+  '/api/dashboard/service': typeof ApiDashboardServiceRoute
+  '/api/public/booking': typeof ApiPublicBookingRoute
+  '/api/public/bookings': typeof ApiPublicBookingsRoute
+  '/api/public/business': typeof ApiPublicBusinessRoute
+  '/api/public/slots': typeof ApiPublicSlotsRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
@@ -134,14 +248,28 @@ export interface FileRoutesById {
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/b/$slug': typeof BSlugRouteWithChildren
+  '/api/auth': typeof ApiAuthRouteWithChildren
+  '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
+  '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
+  '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/data': typeof ApiDashboardDataRoute
+  '/api/dashboard/service': typeof ApiDashboardServiceRoute
+  '/api/public/booking': typeof ApiPublicBookingRoute
+  '/api/public/bookings': typeof ApiPublicBookingsRoute
+  '/api/public/business': typeof ApiPublicBusinessRoute
+  '/api/public/slots': typeof ApiPublicSlotsRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
-  '/b/$slug/confirmed': typeof BSlugConfirmedRoute
+  '/b/$slug_/confirmed': typeof BSlugConfirmedRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -152,10 +280,24 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/api/auth'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/auth/me'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
+    | '/api/auth/signup'
+    | '/api/dashboard/availability'
+    | '/api/dashboard/booking-action'
+    | '/api/dashboard/business'
+    | '/api/dashboard/data'
+    | '/api/dashboard/service'
+    | '/api/public/booking'
+    | '/api/public/bookings'
+    | '/api/public/business'
+    | '/api/public/slots'
     | '/api/stripe/checkout'
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
@@ -167,10 +309,24 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/api/auth'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard'
+    | '/api/auth/me'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
+    | '/api/auth/signup'
+    | '/api/dashboard/availability'
+    | '/api/dashboard/booking-action'
+    | '/api/dashboard/business'
+    | '/api/dashboard/data'
+    | '/api/dashboard/service'
+    | '/api/public/booking'
+    | '/api/public/bookings'
+    | '/api/public/business'
+    | '/api/public/slots'
     | '/api/stripe/checkout'
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
@@ -183,14 +339,28 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/api/auth'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/auth/me'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
+    | '/api/auth/signup'
+    | '/api/dashboard/availability'
+    | '/api/dashboard/booking-action'
+    | '/api/dashboard/business'
+    | '/api/dashboard/data'
+    | '/api/dashboard/service'
+    | '/api/public/booking'
+    | '/api/public/bookings'
+    | '/api/public/business'
+    | '/api/public/slots'
     | '/api/stripe/checkout'
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
-    | '/b/$slug/confirmed'
+    | '/b/$slug_/confirmed'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -200,10 +370,21 @@ export interface RootRouteChildren {
   OnboardingRoute: typeof OnboardingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
-  BSlugRoute: typeof BSlugRouteWithChildren
+  ApiAuthRoute: typeof ApiAuthRouteWithChildren
+  BSlugRoute: typeof BSlugRoute
+  ApiDashboardAvailabilityRoute: typeof ApiDashboardAvailabilityRoute
+  ApiDashboardBookingActionRoute: typeof ApiDashboardBookingActionRoute
+  ApiDashboardBusinessRoute: typeof ApiDashboardBusinessRoute
+  ApiDashboardDataRoute: typeof ApiDashboardDataRoute
+  ApiDashboardServiceRoute: typeof ApiDashboardServiceRoute
+  ApiPublicBookingRoute: typeof ApiPublicBookingRoute
+  ApiPublicBookingsRoute: typeof ApiPublicBookingsRoute
+  ApiPublicBusinessRoute: typeof ApiPublicBusinessRoute
+  ApiPublicSlotsRoute: typeof ApiPublicSlotsRoute
   ApiStripeCheckoutRoute: typeof ApiStripeCheckoutRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTwilioInboundRoute: typeof ApiTwilioInboundRoute
+  BSlugConfirmedRoute: typeof BSlugConfirmedRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -278,12 +459,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/b/$slug/confirmed': {
-      id: '/b/$slug/confirmed'
-      path: '/confirmed'
+    '/api/auth': {
+      id: '/api/auth'
+      path: '/api/auth'
+      fullPath: '/api/auth'
+      preLoaderRoute: typeof ApiAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/b/$slug_/confirmed': {
+      id: '/b/$slug_/confirmed'
+      path: '/b/$slug/confirmed'
       fullPath: '/b/$slug/confirmed'
       preLoaderRoute: typeof BSlugConfirmedRouteImport
-      parentRoute: typeof BSlugRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/twilio/inbound': {
       id: '/api/twilio/inbound'
@@ -306,6 +494,97 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeCheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/slots': {
+      id: '/api/public/slots'
+      path: '/api/public/slots'
+      fullPath: '/api/public/slots'
+      preLoaderRoute: typeof ApiPublicSlotsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/business': {
+      id: '/api/public/business'
+      path: '/api/public/business'
+      fullPath: '/api/public/business'
+      preLoaderRoute: typeof ApiPublicBusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bookings': {
+      id: '/api/public/bookings'
+      path: '/api/public/bookings'
+      fullPath: '/api/public/bookings'
+      preLoaderRoute: typeof ApiPublicBookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/booking': {
+      id: '/api/public/booking'
+      path: '/api/public/booking'
+      fullPath: '/api/public/booking'
+      preLoaderRoute: typeof ApiPublicBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/service': {
+      id: '/api/dashboard/service'
+      path: '/api/dashboard/service'
+      fullPath: '/api/dashboard/service'
+      preLoaderRoute: typeof ApiDashboardServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/data': {
+      id: '/api/dashboard/data'
+      path: '/api/dashboard/data'
+      fullPath: '/api/dashboard/data'
+      preLoaderRoute: typeof ApiDashboardDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/business': {
+      id: '/api/dashboard/business'
+      path: '/api/dashboard/business'
+      fullPath: '/api/dashboard/business'
+      preLoaderRoute: typeof ApiDashboardBusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/booking-action': {
+      id: '/api/dashboard/booking-action'
+      path: '/api/dashboard/booking-action'
+      fullPath: '/api/dashboard/booking-action'
+      preLoaderRoute: typeof ApiDashboardBookingActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/availability': {
+      id: '/api/dashboard/availability'
+      path: '/api/dashboard/availability'
+      fullPath: '/api/dashboard/availability'
+      preLoaderRoute: typeof ApiDashboardAvailabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/signup': {
+      id: '/api/auth/signup'
+      path: '/signup'
+      fullPath: '/api/auth/signup'
+      preLoaderRoute: typeof ApiAuthSignupRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/signout': {
+      id: '/api/auth/signout'
+      path: '/signout'
+      fullPath: '/api/auth/signout'
+      preLoaderRoute: typeof ApiAuthSignoutRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/signin': {
+      id: '/api/auth/signin'
+      path: '/signin'
+      fullPath: '/api/auth/signin'
+      preLoaderRoute: typeof ApiAuthSigninRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/me': {
+      id: '/api/auth/me'
+      path: '/me'
+      fullPath: '/api/auth/me'
+      preLoaderRoute: typeof ApiAuthMeRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
   }
 }
 
@@ -325,15 +604,22 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
-interface BSlugRouteChildren {
-  BSlugConfirmedRoute: typeof BSlugConfirmedRoute
+interface ApiAuthRouteChildren {
+  ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthSigninRoute: typeof ApiAuthSigninRoute
+  ApiAuthSignoutRoute: typeof ApiAuthSignoutRoute
+  ApiAuthSignupRoute: typeof ApiAuthSignupRoute
 }
 
-const BSlugRouteChildren: BSlugRouteChildren = {
-  BSlugConfirmedRoute: BSlugConfirmedRoute,
+const ApiAuthRouteChildren: ApiAuthRouteChildren = {
+  ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthSigninRoute: ApiAuthSigninRoute,
+  ApiAuthSignoutRoute: ApiAuthSignoutRoute,
+  ApiAuthSignupRoute: ApiAuthSignupRoute,
 }
 
-const BSlugRouteWithChildren = BSlugRoute._addFileChildren(BSlugRouteChildren)
+const ApiAuthRouteWithChildren =
+  ApiAuthRoute._addFileChildren(ApiAuthRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -342,10 +628,21 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingRoute: OnboardingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
-  BSlugRoute: BSlugRouteWithChildren,
+  ApiAuthRoute: ApiAuthRouteWithChildren,
+  BSlugRoute: BSlugRoute,
+  ApiDashboardAvailabilityRoute: ApiDashboardAvailabilityRoute,
+  ApiDashboardBookingActionRoute: ApiDashboardBookingActionRoute,
+  ApiDashboardBusinessRoute: ApiDashboardBusinessRoute,
+  ApiDashboardDataRoute: ApiDashboardDataRoute,
+  ApiDashboardServiceRoute: ApiDashboardServiceRoute,
+  ApiPublicBookingRoute: ApiPublicBookingRoute,
+  ApiPublicBookingsRoute: ApiPublicBookingsRoute,
+  ApiPublicBusinessRoute: ApiPublicBusinessRoute,
+  ApiPublicSlotsRoute: ApiPublicSlotsRoute,
   ApiStripeCheckoutRoute: ApiStripeCheckoutRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTwilioInboundRoute: ApiTwilioInboundRoute,
+  BSlugConfirmedRoute: BSlugConfirmedRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

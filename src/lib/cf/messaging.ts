@@ -6,6 +6,12 @@
 // Supabase to D1.
 
 import { getCFEnv, getD1, d1Run } from "./db";
+import {
+  renderBookingConfirmation,
+  renderCancellationMessage,
+  renderOwnerBookingAlert,
+  type BookingMessageContext,
+} from "./message-templates";
 
 type MessageInput = {
   businessId?: string | null;
@@ -34,28 +40,34 @@ export async function logMessageEvent(input: {
 
   const id = crypto.randomUUID();
   await d1Run(
-    db.prepare(`
+    db
+      .prepare(
+        `
       INSERT INTO message_events
         (id, business_id, booking_id, direction, channel, provider,
          provider_message_id, recipient_phone, body, status, raw_payload)
       VALUES (?, ?, ?, ?, 'whatsapp', 'twilio', ?, ?, ?, ?, ?)
-    `).bind(
-      id,
-      input.businessId ?? null,
-      input.bookingId ?? null,
-      input.direction,
-      input.providerMessageId ?? null,
-      input.recipientPhone ?? null,
-      input.body,
-      input.status,
-      input.rawPayload ? JSON.stringify(input.rawPayload) : null,
-    ),
+    `,
+      )
+      .bind(
+        id,
+        input.businessId ?? null,
+        input.bookingId ?? null,
+        input.direction,
+        input.providerMessageId ?? null,
+        input.recipientPhone ?? null,
+        input.body,
+        input.status,
+        input.rawPayload ? JSON.stringify(input.rawPayload) : null,
+      ),
   );
 }
 
 // ─── Twilio send ──────────────────────────────────────────────────────────────
 
-async function sendWhatsApp(input: MessageInput): Promise<{ sid: string | null; loggedOnly: boolean }> {
+async function sendWhatsApp(
+  input: MessageInput,
+): Promise<{ sid: string | null; loggedOnly: boolean }> {
   const env = getCFEnv();
   const accountSid = env?.TWILIO_ACCOUNT_SID;
   const authToken = env?.TWILIO_AUTH_TOKEN;
@@ -108,6 +120,35 @@ export async function sendCancellationMessage(input: MessageInput) {
   return sendWhatsApp(input);
 }
 
+export { renderBookingConfirmation, renderCancellationMessage, renderOwnerBookingAlert };
+
+export async function sendTemplatedBookingConfirmation(
+  input: Omit<MessageInput, "body"> & { booking: BookingMessageContext },
+) {
+  return sendBookingConfirmation({
+    ...input,
+    body: renderBookingConfirmation(input.booking),
+  });
+}
+
+export async function sendTemplatedOwnerBookingAlert(
+  input: Omit<MessageInput, "body"> & { booking: BookingMessageContext },
+) {
+  return sendOwnerBookingAlert({
+    ...input,
+    body: renderOwnerBookingAlert(input.booking),
+  });
+}
+
+export async function sendTemplatedCancellationMessage(
+  input: Omit<MessageInput, "body"> & { booking: BookingMessageContext },
+) {
+  return sendCancellationMessage({
+    ...input,
+    body: renderCancellationMessage(input.booking),
+  });
+}
+
 // ─── Inbound WhatsApp reply handler ──────────────────────────────────────────
 
 export async function handleInboundWhatsAppReply(input: {
@@ -137,11 +178,13 @@ export async function handleInboundWhatsAppReply(input: {
   const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
   const rows = await db
-    .prepare(`
+    .prepare(
+      `
       SELECT id, customer_phone, status, created_at FROM bookings
       WHERE customer_phone = ? AND status != 'cancelled' AND created_at >= ?
       ORDER BY created_at DESC LIMIT 2
-    `)
+    `,
+    )
     .bind(phone, since)
     .all<{ id: string; status: string }>();
 
@@ -154,7 +197,8 @@ export async function handleInboundWhatsAppReply(input: {
 
   const bookingId = rows.results[0].id;
   await d1Run(
-    db.prepare("UPDATE bookings SET status = ?, updated_at = datetime('now') WHERE id = ?")
+    db
+      .prepare("UPDATE bookings SET status = ?, updated_at = datetime('now') WHERE id = ?")
       .bind(command, bookingId),
   );
 

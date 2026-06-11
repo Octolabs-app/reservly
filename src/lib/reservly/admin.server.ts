@@ -1,20 +1,10 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { getServerConfig } from "@/lib/config.server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 let adminClient: SupabaseClient | null | undefined;
 
 export function getSupabaseAdmin() {
   if (adminClient !== undefined) return adminClient;
-  const config = getServerConfig();
-
-  if (!config.supabaseUrl || !config.supabaseServiceRoleKey) {
-    adminClient = null;
-    return adminClient;
-  }
-
-  adminClient = createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
+  adminClient = null;
   return adminClient;
 }
 

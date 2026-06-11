@@ -1,13 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
-import { getBookingById } from "@/lib/reservly/data";
+import { getBookingById } from "@/lib/cf/client-data";
 import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
 import type { Booking } from "@/lib/reservly/types";
 
-export const Route = createFileRoute("/b/$slug/confirmed")({
+export const Route = createFileRoute("/b/$slug_/confirmed")({
   head: () => ({
-    meta: [{ title: "Booking confirmed - Reservly" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Booking confirmed | Reservly" }, { name: "robots", content: "noindex" }],
   }),
   component: ConfirmedPage,
 });

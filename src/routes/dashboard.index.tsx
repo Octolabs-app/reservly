@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kicker, Panel } from "@/components/reservly/AppShell";
-import { getDashboardData } from "@/lib/reservly/data";
+import { getDashboardData } from "@/lib/cf/client-data";
 import { getSiteUrl } from "@/lib/reservly/env";
 import { formatDateLabel, formatTimeLabel, getBookingMonthKey } from "@/lib/reservly/slots";
 import type { Booking, DashboardData } from "@/lib/reservly/types";
@@ -33,7 +33,12 @@ function DashboardHome() {
   ).length;
 
   const bookingLink = data?.business ? `${getSiteUrl()}/b/${data.business.slug}` : "";
-  const displayUrl = data?.business ? `reservly.app/b/${data.business.slug}` : "";
+  const displayUrl = bookingLink.replace(/^https?:\/\//, "");
+  const whatsAppShareUrl = data?.business
+    ? `https://wa.me/?text=${encodeURIComponent(
+        `Book your appointment with ${data.business.name} here: ${bookingLink}`,
+      )}`
+    : "#";
 
   const nextRows = useMemo(
     () =>
@@ -50,8 +55,7 @@ function DashboardHome() {
     setTimeout(() => setCopied(false), 1800);
   }
 
-  if (!data)
-    return <Panel className="p-8 text-sm text-muted-foreground">Loading dashboard...</Panel>;
+  if (!data) return <DashboardSkeleton />;
 
   if (!data.business) {
     return (
@@ -89,14 +93,27 @@ function DashboardHome() {
             {displayUrl}
           </div>
         </div>
-        <a
-          href={`/b/${data.business.slug}`}
-          target="_blank"
-          rel="noreferrer"
-          className="btn-frame self-start sm:self-auto"
-        >
-          Preview
-        </a>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button onClick={copy} className="btn-frame self-start sm:self-auto">
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <a
+            href={whatsAppShareUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-frame self-start sm:self-auto"
+          >
+            WhatsApp
+          </a>
+          <a
+            href={`/b/${data.business.slug}`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-frame self-start sm:self-auto"
+          >
+            Preview
+          </a>
+        </div>
       </Panel>
 
       <div className="grid grid-cols-2 border border-border-strong sm:grid-cols-4">
@@ -137,7 +154,9 @@ function DashboardHome() {
               Free plan usage is {data.usage.used} / {data.usage.limit} bookings this month.
             </p>
           </div>
-          <button className="btn-solid">Upgrade</button>
+          <Link to="/dashboard/settings" className="btn-solid">
+            Upgrade
+          </Link>
         </Panel>
       )}
 
@@ -162,6 +181,45 @@ function DashboardHome() {
           ))}
         </Panel>
       </div>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-4">
+          <div className="h-3 w-40 animate-pulse bg-muted" />
+          <div className="h-12 w-72 max-w-full animate-pulse bg-muted" />
+          <div className="h-4 w-60 max-w-full animate-pulse bg-muted" />
+        </div>
+        <div className="h-10 w-40 animate-pulse border border-border-strong bg-muted/40" />
+      </div>
+      <Panel className="p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-3">
+            <div className="h-3 w-32 animate-pulse bg-muted" />
+            <div className="h-6 w-64 max-w-full animate-pulse bg-muted" />
+          </div>
+          <div className="h-10 w-28 animate-pulse border border-border-strong bg-muted/40" />
+        </div>
+      </Panel>
+      <div className="grid grid-cols-2 border border-border-strong sm:grid-cols-4">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="space-y-3 border-border-strong p-5 sm:border-r">
+            <div className="h-8 w-16 animate-pulse bg-muted" />
+            <div className="h-3 w-24 animate-pulse bg-muted" />
+          </div>
+        ))}
+      </div>
+      <Panel className="p-6">
+        <div className="space-y-4">
+          {[0, 1, 2].map((item) => (
+            <div key={item} className="h-14 animate-pulse border border-border bg-muted/40" />
+          ))}
+        </div>
+      </Panel>
     </div>
   );
 }

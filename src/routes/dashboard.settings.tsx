@@ -8,13 +8,14 @@ import {
   updateAvailability,
   updateBusiness,
   updateService,
-} from "@/lib/reservly/data";
+} from "@/lib/cf/client-data";
 import { getSiteUrl } from "@/lib/reservly/env";
 import type {
   Availability,
   BookingLanguage,
   Business,
   DashboardData,
+  Plan,
   Service,
 } from "@/lib/reservly/types";
 
@@ -31,6 +32,7 @@ function SettingsTab() {
   const [services, setServices] = useState<Service[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [saving, setSaving] = useState(false);
+  const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function refresh() {
@@ -123,8 +125,32 @@ function SettingsTab() {
     await refresh();
   }
 
-  if (!data || !business)
-    return <Panel className="p-8 text-sm text-muted-foreground">Loading settings...</Panel>;
+  async function startCheckout(plan: Extract<Plan, "pro" | "studio">) {
+    if (!business) return;
+    setCheckoutPlan(plan);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ businessId: business.id, plan }),
+      });
+      const result = (await response.json()) as { url?: string | null; message?: string };
+      if (!response.ok) throw new Error(result.message ?? "Checkout could not start.");
+      if (result.url) {
+        window.location.href = result.url;
+        return;
+      }
+      setMessage("Online upgrades are almost ready. Contact Octolabs to enable Pro or Studio.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Checkout could not start.");
+    } finally {
+      setCheckoutPlan(null);
+    }
+  }
+
+  if (!data || !business) return <SettingsSkeleton />;
 
   const bookingLink = `${getSiteUrl()}/b/${business.slug}`;
   const usageLabel = data.usage.limit
@@ -164,8 +190,20 @@ function SettingsTab() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button className="btn-frame">Pro</button>
-          <button className="btn-solid">Studio</button>
+          <button
+            disabled={checkoutPlan !== null}
+            onClick={() => void startCheckout("pro")}
+            className="btn-frame"
+          >
+            {checkoutPlan === "pro" ? "Opening" : "Pro"}
+          </button>
+          <button
+            disabled={checkoutPlan !== null}
+            onClick={() => void startCheckout("studio")}
+            className="btn-solid"
+          >
+            {checkoutPlan === "studio" ? "Opening" : "Studio"}
+          </button>
         </div>
       </Panel>
 
@@ -388,6 +426,29 @@ function SettingsTab() {
             ))}
         </div>
       </Panel>
+    </div>
+  );
+}
+
+function SettingsSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="space-y-4">
+        <div className="h-3 w-48 animate-pulse bg-muted" />
+        <div className="h-12 w-52 animate-pulse bg-muted" />
+        <div className="h-4 w-80 max-w-full animate-pulse bg-muted" />
+      </div>
+      {[0, 1, 2].map((panel) => (
+        <Panel key={panel} className="p-6">
+          <div className="space-y-4">
+            <div className="h-4 w-36 animate-pulse bg-muted" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="h-12 animate-pulse border-b border-border-strong bg-muted/30" />
+              <div className="h-12 animate-pulse border-b border-border-strong bg-muted/30" />
+            </div>
+          </div>
+        </Panel>
+      ))}
     </div>
   );
 }

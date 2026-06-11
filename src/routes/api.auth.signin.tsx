@@ -24,4 +24,6 @@ export const Route = createFileRoute("/api/auth/signin")({
   },
 });
 
-function Empty() { return null; }
+function Empty() {
+  return null;
+}

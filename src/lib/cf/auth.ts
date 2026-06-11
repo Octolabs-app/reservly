@@ -67,8 +67,8 @@ export async function resolveSession(sessionId: string): Promise<Owner | null> {
 
   // KV fast path
   if (kv) {
-    const cached = await kv.get(`session:${sessionId}`, { type: "json" });
-    if (cached) return cached as Owner;
+    const cached = await kv.get<Owner>(`session:${sessionId}`, { type: "json" });
+    if (cached) return cached;
   }
 
   const db = getD1();
@@ -92,7 +92,10 @@ export async function resolveSession(sessionId: string): Promise<Owner | null> {
 
   // Backfill KV cache
   if (kv) {
-    const remaining = Math.max(0, Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000));
+    const remaining = Math.max(
+      0,
+      Math.floor((new Date(session.expires_at).getTime() - Date.now()) / 1000),
+    );
     await kv.put(`session:${sessionId}`, JSON.stringify(owner), {
       expirationTtl: Math.min(remaining, KV_TTL_SECONDS),
     });
@@ -108,13 +111,11 @@ export async function resolveSession(sessionId: string): Promise<Owner | null> {
  * In dev mode (no D1) returns the dev-store owner.
  */
 export async function getCurrentOwner(request?: Request): Promise<Owner | null> {
-  if (!isD1Enabled()) return getDevOwner();
-
   const cookieHeader = request?.headers.get("cookie") ?? null;
 
   // Browser context: read from document.cookie via a client-side fetch to /api/auth/me
   // For SSR / server handlers: pass the request object
-  if (!cookieHeader && typeof document !== "undefined") {
+  if (!request && typeof document !== "undefined") {
     try {
       const res = await fetch("/api/auth/me", { credentials: "include" });
       if (!res.ok) return null;
@@ -123,6 +124,8 @@ export async function getCurrentOwner(request?: Request): Promise<Owner | null> 
       return null;
     }
   }
+
+  if (!isD1Enabled()) return getDevOwner();
 
   const sessionId = getSessionIdFromCookieHeader(cookieHeader);
   if (!sessionId) return null;
@@ -144,7 +147,9 @@ export async function signInOwner(
 
   const db = getD1()!;
   const ownerRow = await d1First<OwnerRow>(
-    db.prepare("SELECT id, email, full_name, password_hash FROM owners WHERE email = ?").bind(email.trim().toLowerCase()),
+    db
+      .prepare("SELECT id, email, full_name, password_hash FROM owners WHERE email = ?")
+      .bind(email.trim().toLowerCase()),
   );
   if (!ownerRow) throw new Error("Invalid email or password.");
 

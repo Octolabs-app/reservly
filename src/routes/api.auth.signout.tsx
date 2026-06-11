@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { signOutOwner, resolveSession, getSessionIdFromCookieHeader } from "@/lib/cf/auth";
+import { getSessionIdFromCookieHeader, signOutOwner } from "@/lib/cf/auth";
 
 export const Route = createFileRoute("/api/auth/signout")({
   component: Empty,
@@ -14,4 +14,6 @@ export const Route = createFileRoute("/api/auth/signout")({
   },
 });
 
-function Empty() { return null; }
+function Empty() {
+  return null;
+}

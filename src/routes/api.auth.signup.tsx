@@ -8,7 +8,10 @@ export const Route = createFileRoute("/api/auth/signup")({
       POST: async ({ request }) => {
         const { email, password } = (await request.json()) as { email?: string; password?: string };
         if (!email || !password || password.length < 6) {
-          return Response.json({ error: "Valid email and password (min 6 chars) required." }, { status: 400 });
+          return Response.json(
+            { error: "Valid email and password (min 6 chars) required." },
+            { status: 400 },
+          );
         }
         try {
           const { owner, sessionCookie } = await signUpOwner(email, password);
@@ -24,4 +27,6 @@ export const Route = createFileRoute("/api/auth/signup")({
   },
 });
 
-function Empty() { return null; }
+function Empty() {
+  return null;
+}

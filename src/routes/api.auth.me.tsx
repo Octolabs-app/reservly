@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { resolveSession, getSessionIdFromCookieHeader } from "@/lib/cf/auth";
+import { getCurrentOwner, getSessionIdFromCookieHeader, resolveSession } from "@/lib/cf/auth";
 
 export const Route = createFileRoute("/api/auth/me")({
   component: Empty,
@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/auth/me")({
     handlers: {
       GET: async ({ request }) => {
         const sessionId = getSessionIdFromCookieHeader(request.headers.get("cookie"));
-        if (!sessionId) return Response.json(null);
+        if (!sessionId) return Response.json(await getCurrentOwner(request));
         const owner = await resolveSession(sessionId);
         return Response.json(owner ?? null);
       },
@@ -15,4 +15,6 @@ export const Route = createFileRoute("/api/auth/me")({
   },
 });
 
-function Empty() { return null; }
+function Empty() {
+  return null;
+}

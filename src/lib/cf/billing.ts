@@ -75,11 +75,15 @@ export async function handleStripeWebhook(
 
       // Update business plan + limit
       await d1Run(
-        db.prepare(`
+        db
+          .prepare(
+            `
           UPDATE businesses SET
             plan = ?, booking_limit_monthly = ?, updated_at = datetime('now')
           WHERE id = ?
-        `).bind(active ? plan : "free", active ? null : 15, businessId),
+        `,
+          )
+          .bind(active ? plan : "free", active ? null : 15, businessId),
       );
 
       // Upsert subscription record
@@ -95,7 +99,9 @@ export async function handleStripeWebhook(
         "status" in object && typeof object.status === "string" ? object.status : "active";
 
       await d1Run(
-        db.prepare(`
+        db
+          .prepare(
+            `
           INSERT INTO subscriptions
             (id, business_id, stripe_customer_id, stripe_subscription_id, plan, status, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
@@ -104,11 +110,16 @@ export async function handleStripeWebhook(
             stripe_subscription_id = excluded.stripe_subscription_id,
             plan = excluded.plan, status = excluded.status,
             updated_at = datetime('now')
-        `).bind(
-          crypto.randomUUID(), businessId,
-          stripeCustomerId, stripeSubId,
-          active ? plan : "free", subStatus,
-        ),
+        `,
+          )
+          .bind(
+            crypto.randomUUID(),
+            businessId,
+            stripeCustomerId,
+            stripeSubId,
+            active ? plan : "free",
+            subStatus,
+          ),
       );
     }
   }

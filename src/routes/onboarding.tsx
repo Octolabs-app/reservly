@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
-import { getCurrentOwner } from "@/lib/reservly/auth";
-import { createBusiness, createService, updateAvailability } from "@/lib/reservly/data";
+import { getCurrentOwner } from "@/lib/cf/auth";
+import { createBusiness, createService, updateAvailability } from "@/lib/cf/client-data";
 import type { BookingLanguage } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/onboarding")({
@@ -22,6 +22,13 @@ export const Route = createFileRoute("/onboarding")({
 const CATEGORIES = ["Beauty", "Health", "Fitness", "Tutor", "Home", "Hospitality", "Other"];
 const LANGS: BookingLanguage[] = ["English", "Francais", "Both"];
 const DURATIONS = [15, 30, 45, 60, 90, 120];
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const hours = Math.floor(index / 2)
+    .toString()
+    .padStart(2, "0");
+  const minutes = index % 2 === 0 ? "00" : "30";
+  return `${hours}:${minutes}`;
+});
 const DAYS = [
   { label: "Mon", dayOfWeek: 1 },
   { label: "Tue", dayOfWeek: 2 },
@@ -125,9 +132,37 @@ function OnboardingPage() {
     }
   }
 
-  if (!checkingAuth && needsAuth) {
-    window.location.href = "/auth?redirectTo=/onboarding";
-    return null;
+  if (checkingAuth) {
+    return (
+      <>
+        <SiteHeader />
+        <Page width="md">
+          <OnboardingAuthSkeleton />
+        </Page>
+      </>
+    );
+  }
+
+  if (needsAuth) {
+    return (
+      <>
+        <SiteHeader />
+        <Page width="sm">
+          <Panel className="p-8">
+            <Kicker tone="accent">Owner sign-in required</Kicker>
+            <h1 className="mt-4 font-serif text-4xl text-foreground">
+              Sign in before setting up your booking page.
+            </h1>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Reservly saves your business, services, hours, and booking link to your owner account.
+            </p>
+            <a href="/auth?redirectTo=/onboarding" className="btn-solid mt-6 inline-flex">
+              Sign in or create account
+            </a>
+          </Panel>
+        </Page>
+      </>
+    );
   }
 
   return (
@@ -350,7 +385,7 @@ function OnboardingPage() {
                       <div className="ml-auto flex items-center gap-2">
                         <TimeSelect
                           value={hour.opensAt}
-                          options={["07:00", "08:00", "09:00", "10:00", "11:00"]}
+                          options={TIME_OPTIONS}
                           onChange={(value) => {
                             const next = [...hours];
                             next[index] = { ...next[index], opensAt: value };
@@ -360,7 +395,7 @@ function OnboardingPage() {
                         <span className="text-muted-foreground">to</span>
                         <TimeSelect
                           value={hour.closesAt}
-                          options={["15:00", "16:00", "17:00", "18:00", "19:00", "20:00"]}
+                          options={TIME_OPTIONS}
                           onChange={(value) => {
                             const next = [...hours];
                             next[index] = { ...next[index], closesAt: value };
@@ -407,6 +442,33 @@ function OnboardingPage() {
         </Panel>
       </Page>
     </>
+  );
+}
+
+function OnboardingAuthSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div className="h-3 w-40 animate-pulse bg-muted" />
+        <div className="h-3 w-20 animate-pulse bg-muted" />
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="space-y-3">
+            <div className="h-px animate-pulse bg-muted" />
+            <div className="h-3 w-24 animate-pulse bg-muted" />
+          </div>
+        ))}
+      </div>
+      <Panel className="p-8 sm:p-10">
+        <div className="space-y-6">
+          <div className="h-9 w-72 max-w-full animate-pulse bg-muted" />
+          <div className="h-4 w-80 max-w-full animate-pulse bg-muted" />
+          <div className="h-14 animate-pulse border-b border-border-strong bg-muted/30" />
+          <div className="h-14 animate-pulse border-b border-border-strong bg-muted/30" />
+        </div>
+      </Panel>
+    </div>
   );
 }
 

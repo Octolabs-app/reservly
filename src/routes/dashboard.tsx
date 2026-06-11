@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Brand } from "@/components/reservly/AppShell";
-import { getCurrentOwner, signOutOwner } from "@/lib/reservly/auth";
+import { getCurrentOwner } from "@/lib/cf/auth";
 import type { Owner } from "@/lib/reservly/types";
 
 export const Route = createFileRoute("/dashboard")({
@@ -28,7 +28,7 @@ function DashboardLayout() {
   }, []);
 
   async function signOut() {
-    await signOutOwner();
+    await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
     window.location.href = "/";
   }
 

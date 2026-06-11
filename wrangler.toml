@@ -29,16 +29,16 @@ pages_build_output_dir = "./dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "reservly-db"
-database_id = "PASTE_YOUR_D1_DATABASE_ID_HERE"
+database_id = "7220664c-4098-4dcf-8030-470443007e2f"
 
 # ─── KV Namespace (session cache) ────────────────────────────────────────────
 [[kv_namespaces]]
 binding = "KV"
-id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE"
+id = "bfaeb12444044848bb6b60a09e112953"
 
 # ─── Environment variables (non-secret) ──────────────────────────────────────
 [vars]
-SITE_URL = "https://reservly.app"
+SITE_URL = "https://reservly.octolabs.app"
 
 # ─── Secrets (set via `wrangler secret put <NAME>`, never in this file) ──────
 # SESSION_SECRET

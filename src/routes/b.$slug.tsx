@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
-import { createBooking, getAvailableSlots, getPublicBusinessBySlug } from "@/lib/reservly/data";
+import { createBooking, getAvailableSlots, getPublicBusinessBySlug } from "@/lib/cf/client-data";
 import { addDays, dateInputFromDate } from "@/lib/reservly/slots";
 import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/reservly/types";
 
@@ -69,9 +69,8 @@ function BookingPage() {
   }, [data, serviceId, date]);
 
   const service = data?.services.find((entry) => entry.id === serviceId) ?? null;
-  const ready = Boolean(
-    service && selectedSlot && name.trim().length > 1 && phone.trim().length > 4,
-  );
+  const phoneValidation = validateWhatsAppNumber(phone);
+  const ready = Boolean(service && selectedSlot && name.trim().length > 1 && !phoneValidation);
 
   async function confirm() {
     if (!data || !service || !selectedSlot || !ready) return;
@@ -82,7 +81,7 @@ function BookingPage() {
         businessId: data.business.id,
         serviceId: service.id,
         customerName: name,
-        customerPhone: phone,
+        customerPhone: normalizeWhatsAppNumber(phone),
         customerLanguage: language,
         startAt: selectedSlot.startAt,
       });
@@ -98,9 +97,7 @@ function BookingPage() {
     <>
       <SiteHeader />
       <Page width="md">
-        {loading && (
-          <Panel className="p-8 text-sm text-muted-foreground">Loading booking page...</Panel>
-        )}
+        {loading && <BookingPageSkeleton />}
 
         {!loading && !data && (
           <Panel className="p-8">
@@ -220,10 +217,25 @@ function BookingPage() {
                       <input
                         value={phone}
                         onChange={(event) => setPhone(event.target.value)}
-                        placeholder="+23057000000"
+                        onBlur={() => {
+                          const normalized = normalizeWhatsAppNumber(phone);
+                          if (!validateWhatsAppNumber(normalized)) setPhone(normalized);
+                        }}
+                        placeholder="+230 5700 0000"
                         className="w-full bg-transparent py-3 text-lg text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
                       />
                     </Field>
+                    <p
+                      className={`text-xs ${
+                        phone.trim() && phoneValidation
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {phone.trim() && phoneValidation
+                        ? phoneValidation
+                        : "Use an international WhatsApp number. Mauritius mobile numbers can be entered as 5XXXXXXX."}
+                    </p>
                     <div>
                       <div className="kicker">Language</div>
                       <div className="mt-3 grid grid-cols-3 gap-2">
@@ -262,6 +274,46 @@ function BookingPage() {
         )}
       </Page>
     </>
+  );
+}
+
+function normalizeWhatsAppNumber(value: string) {
+  const compact = value.trim().replace(/[()\s-]/g, "");
+  if (/^5\d{7}$/.test(compact)) return `+230${compact}`;
+  return compact;
+}
+
+function validateWhatsAppNumber(value: string) {
+  const normalized = normalizeWhatsAppNumber(value);
+  if (!normalized) return "WhatsApp number is required.";
+  if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
+    return "Enter a valid international WhatsApp number, for example +23057000000.";
+  }
+  return null;
+}
+
+function BookingPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="h-3 w-40 animate-pulse bg-muted" />
+        <div className="h-12 w-3/4 animate-pulse bg-muted" />
+        <div className="h-4 w-2/3 animate-pulse bg-muted" />
+      </div>
+      <Panel className="p-6 sm:p-8">
+        <div className="space-y-8">
+          {[0, 1, 2, 3].map((section) => (
+            <div key={section} className="space-y-3">
+              <div className="h-3 w-36 animate-pulse bg-muted" />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="h-16 animate-pulse border border-border-strong bg-muted/40" />
+                <div className="h-16 animate-pulse border border-border-strong bg-muted/40" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+    </div>
   );
 }
 

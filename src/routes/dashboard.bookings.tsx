@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Kicker, Panel } from "@/components/reservly/AppShell";
-import { cancelBooking, getDashboardData, markBookingConfirmed } from "@/lib/reservly/data";
+import { cancelBooking, getDashboardData, markBookingConfirmed } from "@/lib/cf/client-data";
 import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
 import type { Booking, BookingStatus, DashboardData } from "@/lib/reservly/types";
 
@@ -49,8 +49,7 @@ function BookingsTab() {
     }
   }
 
-  if (!data)
-    return <Panel className="p-8 text-sm text-muted-foreground">Loading bookings...</Panel>;
+  if (!data) return <BookingsSkeleton />;
 
   return (
     <div className="space-y-8">
@@ -136,6 +135,27 @@ function BookingsTab() {
             </div>
           </div>
         ))}
+      </Panel>
+    </div>
+  );
+}
+
+function BookingsSkeleton() {
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-4">
+          <div className="h-3 w-28 animate-pulse bg-muted" />
+          <div className="h-12 w-64 animate-pulse bg-muted" />
+        </div>
+        <div className="h-10 w-72 max-w-full animate-pulse border border-border-strong bg-muted/40" />
+      </div>
+      <Panel className="p-5">
+        <div className="space-y-3">
+          {[0, 1, 2, 3].map((item) => (
+            <div key={item} className="h-16 animate-pulse border border-border bg-muted/40" />
+          ))}
+        </div>
       </Panel>
     </div>
   );

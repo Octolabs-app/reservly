@@ -33,7 +33,7 @@ function AuthPage() {
         credentials: "include",
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json() as { error?: string };
+      const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Authentication failed.");
       window.location.href = redirectTo;
     } catch (err) {

@@ -40,6 +40,7 @@ export function SiteHeader() {
   const navCls =
     "font-display text-[11px] tracking-[0.3em] uppercase text-muted-foreground hover:text-accent transition-colors px-3 py-2";
   const activeCls = "text-foreground";
+  const showDemoBooking = import.meta.env.DEV;
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/70 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -52,9 +53,11 @@ export function SiteHeader() {
           >
             Onboarding
           </Link>
-          <Link to="/b/$slug" params={{ slug: "salon-rose" }} className={navCls}>
-            Booking
-          </Link>
+          {showDemoBooking && (
+            <Link to="/b/$slug" params={{ slug: "salon-rose" }} className={navCls}>
+              Booking
+            </Link>
+          )}
           <Link
             to="/dashboard"
             className={navCls}

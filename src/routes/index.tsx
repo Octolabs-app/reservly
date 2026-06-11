@@ -47,8 +47,8 @@ function Landing() {
               <Link to="/onboarding" className="btn-frame-primary">
                 Get started
               </Link>
-              <Link to="/b/$slug" params={{ slug: "salon-rose" }} className="btn-frame">
-                See a booking page
+              <Link to="/dashboard" className="btn-frame">
+                Owner dashboard
               </Link>
             </div>
 
@@ -105,12 +105,12 @@ function Landing() {
                   desc: "Business, services, hours.",
                   to: "/onboarding",
                 },
-                { n: "02", title: "Booking", desc: "Pick. Tap. Done.", to: "/b/salon-rose" },
+                { n: "02", title: "Booking", desc: "Pick. Tap. Done.", to: "/onboarding" },
                 {
                   n: "03",
                   title: "Confirmation",
                   desc: "WhatsApp ping arrives.",
-                  to: "/b/salon-rose/confirmed",
+                  to: "/onboarding",
                 },
                 { n: "04", title: "Dashboard", desc: "Manage the day.", to: "/dashboard" },
               ].map((s) => (

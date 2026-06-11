@@ -58,10 +58,20 @@ export type CloudflareEnv = {
 };
 
 export type KVNamespace = {
-  get: (key: string, options?: { type?: "text" | "json" | "arrayBuffer" | "stream" }) => Promise<string | null>;
-  put: (key: string, value: string | ArrayBuffer, options?: { expirationTtl?: number }) => Promise<void>;
+  get: <T = string>(
+    key: string,
+    options?: { type?: "text" | "json" | "arrayBuffer" | "stream" },
+  ) => Promise<T | null>;
+  put: (
+    key: string,
+    value: string | ArrayBuffer,
+    options?: { expirationTtl?: number },
+  ) => Promise<void>;
   delete: (key: string) => Promise<void>;
-  list: (options?: { prefix?: string; limit?: number }) => Promise<{ keys: Array<{ name: string; expiration?: number }> }>;
+  list: (options?: {
+    prefix?: string;
+    limit?: number;
+  }) => Promise<{ keys: Array<{ name: string; expiration?: number }> }>;
 };
 
 // Module-level cache: populated once per Worker isolate from the Nitro context.
@@ -100,9 +110,7 @@ export function isD1Enabled(): boolean {
  * Thin typed query helper. Throws on D1 error so callers don't need to
  * manually check .success.
  */
-export async function d1All<T = Record<string, unknown>>(
-  stmt: D1PreparedStatement,
-): Promise<T[]> {
+export async function d1All<T = Record<string, unknown>>(stmt: D1PreparedStatement): Promise<T[]> {
   const result = await stmt.all<T>();
   if (!result.success) throw new Error(result.error ?? "D1 query failed");
   return result.results;
