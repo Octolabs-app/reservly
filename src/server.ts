@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import { initCFBindings, type CloudflareEnv } from "./lib/cf/db";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -39,6 +40,12 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    // Inject Cloudflare bindings (D1, KV, secrets) before any handler runs.
+    // On local Vite dev, env will be undefined/empty — initCFBindings is a no-op
+    // and the app falls back to the in-browser dev-store automatically.
+    if (env && typeof env === "object") {
+      initCFBindings(env as CloudflareEnv);
+    }
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);

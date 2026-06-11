@@ -17,11 +17,13 @@ import process from "node:process";
 //     VITE_ prefix. Never put secrets here — they ship to the browser.
 
 export function getServerConfig() {
+  // NOTE: On Cloudflare Workers, secrets are injected via the CF env binding
+  // (see src/lib/cf/db.ts getCFEnv()) — not process.env.
+  // process.env is kept here only for local Vite dev fallback and legacy callers.
+  // All new CF server code should call getCFEnv() from src/lib/cf/db.ts instead.
   return {
     nodeEnv: process.env.NODE_ENV,
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
-    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // Supabase vars intentionally removed — see migration guide in CLOUDFLARE_SETUP.md
     twilioAccountSid: process.env.TWILIO_ACCOUNT_SID,
     twilioAuthToken: process.env.TWILIO_AUTH_TOKEN,
     twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM,

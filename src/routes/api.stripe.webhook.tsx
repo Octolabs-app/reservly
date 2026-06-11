@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { handleStripeWebhook } from "@/lib/reservly/billing.server";
+import { handleStripeWebhook } from "@/lib/cf/billing";
 
 export const Route = createFileRoute("/api/stripe/webhook")({
   component: Empty,

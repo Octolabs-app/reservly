@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
-import { authModeLabel, signInOwner, signUpOwner } from "@/lib/reservly/auth";
+import { authModeLabel } from "@/lib/cf/auth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -26,8 +26,15 @@ function AuthPage() {
     setBusy(true);
     setError(null);
     try {
-      if (mode === "sign-in") await signInOwner(email, password);
-      else await signUpOwner(email, password);
+      const endpoint = mode === "sign-in" ? "/api/auth/signin" : "/api/auth/signup";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Authentication failed.");
       window.location.href = redirectTo;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed.");

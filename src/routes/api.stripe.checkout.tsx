@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createCheckoutSession } from "@/lib/reservly/billing.server";
+import { createCheckoutSession } from "@/lib/cf/billing";
 
 export const Route = createFileRoute("/api/stripe/checkout")({
   component: Empty,
@@ -10,7 +10,6 @@ export const Route = createFileRoute("/api/stripe/checkout")({
         if (!body.businessId || (body.plan !== "pro" && body.plan !== "studio")) {
           return Response.json({ error: "Invalid checkout request." }, { status: 400 });
         }
-
         const result = await createCheckoutSession({
           businessId: body.businessId,
           plan: body.plan,

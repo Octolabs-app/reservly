@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { handleInboundWhatsAppReply } from "@/lib/reservly/messaging.server";
+import { handleInboundWhatsAppReply } from "@/lib/cf/messaging";
 
 export const Route = createFileRoute("/api/twilio/inbound")({
   component: Empty,
