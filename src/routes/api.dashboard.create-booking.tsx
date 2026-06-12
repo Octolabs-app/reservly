@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireApiOwner, jsonError } from "@/lib/cf/api";
-import { updateAvailability } from "@/lib/cf/data";
-import type { AvailabilityInput } from "@/lib/rezavu/types";
+import { createOwnerBooking } from "@/lib/cf/data";
+import type { BookingInput } from "@/lib/rezavu/types";
 
-export const Route = createFileRoute("/api/dashboard/availability")({
+export const Route = createFileRoute("/api/dashboard/create-booking")({
   component: Empty,
   server: {
     handlers: {
@@ -11,8 +11,8 @@ export const Route = createFileRoute("/api/dashboard/availability")({
         const owner = await requireApiOwner(request);
         if (owner instanceof Response) return owner;
         try {
-          const input = (await request.json()) as AvailabilityInput;
-          return Response.json(await updateAvailability(input, owner.id));
+          const input = (await request.json()) as BookingInput;
+          return Response.json(await createOwnerBooking(input, owner.id));
         } catch (error) {
           return jsonError(error);
         }

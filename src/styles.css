@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Reservly · island-light design system (from reservly_mvp_v2)
+ * Rezavu · island-light design system (from rezavu_mvp_v2)
  * Lagoon-blue primary, warm coral accent, WhatsApp green for messaging cues.
  * Light, friendly, mobile-first. All colors via semantic tokens.
  */
@@ -148,14 +148,6 @@
   letter-spacing: -0.02em;
 }
 
-/* Kept for legacy references; renders as a strong sans heading */
-@utility font-serif {
-  font-family: var(--font-sans);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-style: normal;
-}
-
 /* Small uppercase section label */
 @utility kicker {
   font-size: 0.6875rem;
@@ -165,45 +157,7 @@
   color: var(--color-muted-foreground);
 }
 
-@utility kicker-rule {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-muted-foreground);
-}
-
 /* ─── Buttons ─────────────────────────────────────────────────────────── */
-@utility btn-base {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  padding: 0.625rem 1.125rem;
-  border-radius: 0.625rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease,
-    transform 0.1s ease;
-}
-
-@utility btn-base {
-  &:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-  &:disabled {
-    cursor: not-allowed;
-    background: var(--color-surface-2);
-    color: var(--color-muted-foreground);
-    border-color: var(--color-border);
-    opacity: 0.8;
-  }
-}
-
 /* Solid lagoon-blue CTA */
 @utility btn-solid {
   display: inline-flex;
@@ -397,19 +351,6 @@
   &:disabled {
     opacity: 0.5;
   }
-}
-
-/* ─── Legacy decorative utilities (neutralised for the light theme) ──── */
-@utility grid-bg {
-  background-color: var(--color-surface);
-}
-
-@utility grid-bg-sm {
-  background-color: var(--color-surface);
-}
-
-@utility scan-line {
-  position: relative;
 }
 
 @keyframes pulse-dot {

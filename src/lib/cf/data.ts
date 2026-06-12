@@ -1,6 +1,6 @@
 // src/lib/cf/data.ts
 // Data access layer backed by Cloudflare D1.
-// Replaces: src/lib/reservly/data.ts (Supabase SDK calls)
+// Replaces: src/lib/rezavu/data.ts (Supabase SDK calls)
 //
 // All functions follow the same dual-path pattern as the original:
 //   - If D1 is available  → use D1
@@ -26,13 +26,14 @@ import {
   devSlugExists,
   getDevBookingById,
   getDevDashboardData,
+  getDevPublicBusinessById,
   getDevPublicBusinessBySlug,
   saveLastBooking,
   updateDevAvailability,
   updateDevBusiness,
   updateDevService,
-} from "@/lib/reservly/dev-store";
-import { generateUniqueSlug } from "@/lib/reservly/slug";
+} from "@/lib/rezavu/dev-store";
+import { generateUniqueSlug } from "@/lib/rezavu/slug";
 import {
   calculateMonthlyUsage,
   formatDateLabel,
@@ -41,7 +42,9 @@ import {
   getMauritiusDayOfWeek,
   isoFromMauritiusLocal,
   mauritiusDateFromIso,
-} from "@/lib/reservly/slots";
+  mauritiusMonthBounds,
+} from "@/lib/rezavu/slots";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
 import {
   DEFAULT_MAX_ADVANCE_DAYS,
   DEFAULT_MIN_NOTICE_MINUTES,
@@ -50,6 +53,7 @@ import {
   type Availability,
   type AvailabilityInput,
   type Booking,
+  type BookingLanguage,
   type BookingInput,
   type Business,
   type BusinessInput,
@@ -60,7 +64,7 @@ import {
   type Service,
   type ServiceInput,
   type Slot,
-} from "@/lib/reservly/types";
+} from "@/lib/rezavu/types";
 
 // ─── Row types (D1 column names) ─────────────────────────────────────────────
 
@@ -104,8 +108,36 @@ async function ensureBusinessOwner(
   if (!row) throw new Error("You do not have access to this business.");
 }
 
+/**
+ * Booking-rule values come straight from request JSON — clamp them so a bad
+ * PATCH can't poison slot generation (a 0/negative interval would loop the
+ * public slots endpoint forever).
+ */
+function clampBookingRules(input: Partial<BusinessInput>) {
+  const out: {
+    minNoticeMinutes?: number;
+    maxAdvanceDays?: number;
+    slotIntervalMinutes?: number | null;
+  } = {};
+  if (input.minNoticeMinutes != null) {
+    out.minNoticeMinutes = Math.min(43200, Math.max(0, Math.round(input.minNoticeMinutes) || 0));
+  }
+  if (input.maxAdvanceDays != null) {
+    out.maxAdvanceDays = Math.min(
+      365,
+      Math.max(1, Math.round(input.maxAdvanceDays) || DEFAULT_MAX_ADVANCE_DAYS),
+    );
+  }
+  if ("slotIntervalMinutes" in input) {
+    out.slotIntervalMinutes = [15, 30, 60].includes(input.slotIntervalMinutes as number)
+      ? (input.slotIntervalMinutes as number)
+      : null;
+  }
+  return out;
+}
+
 function siteUrlFromEnv() {
-  return (getCFEnv()?.SITE_URL ?? "https://reservly.octolabs.app").replace(/\/$/, "");
+  return (getCFEnv()?.SITE_URL ?? "https://rezavu.octolabs.app").replace(/\/$/, "");
 }
 type ServiceRow = {
   id: string;
@@ -262,12 +294,12 @@ export async function createBusiness(
         slug,
         input.category,
         input.city.trim(),
-        input.whatsappNumber.trim(),
+        normalizeWhatsAppNumber(input.whatsappNumber),
         input.bookingPageLanguage,
         FREE_BOOKING_LIMIT,
-        input.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
-        input.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
-        input.slotIntervalMinutes ?? null,
+        clampBookingRules(input).minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+        clampBookingRules(input).maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
+        clampBookingRules(input).slotIntervalMinutes ?? null,
       ),
   );
 
@@ -359,12 +391,12 @@ export async function updateBusiness(
         input.name ?? null,
         input.category ?? null,
         input.city ?? null,
-        input.whatsappNumber ?? null,
+        input.whatsappNumber != null ? normalizeWhatsAppNumber(input.whatsappNumber) : null,
         input.bookingPageLanguage ?? null,
-        input.minNoticeMinutes ?? null,
-        input.maxAdvanceDays ?? null,
+        clampBookingRules(input).minNoticeMinutes ?? null,
+        clampBookingRules(input).maxAdvanceDays ?? null,
         "slotIntervalMinutes" in input ? 1 : 0,
-        input.slotIntervalMinutes ?? null,
+        clampBookingRules(input).slotIntervalMinutes ?? null,
         input.id,
         currentOwnerId,
       ),
@@ -523,17 +555,17 @@ export async function getAvailableSlots(
   date: string,
 ): Promise<Slot[]> {
   if (!isD1Enabled()) {
-    const devPublic = await getDevPublicBusinessBySlug("salon-rose");
+    const devPublic = await getDevPublicBusinessById(businessId);
     const service = devPublic?.services.find((s) => s.id === serviceId);
-    if (!service) return [];
+    if (!devPublic || !service) return [];
     return generateSlots({
       date,
       service,
-      availability: devPublic?.availability ?? [],
-      bookings: [],
-      monthlyFull: devPublic?.usage.full ?? false,
-      stepMinutes: devPublic?.business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
-      minNoticeMinutes: devPublic?.business.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+      availability: devPublic.availability,
+      bookings: devPublic.bookings ?? [],
+      monthlyFull: devPublic.usage.full,
+      stepMinutes: devPublic.business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+      minNoticeMinutes: devPublic.business.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
     });
   }
 
@@ -561,10 +593,14 @@ export async function getAvailableSlots(
   const business = mapBusiness(bizRow);
   const service = mapService(serviceRow);
   const bookings = bookingRows.map(mapBooking);
+  // Judge "month full" against the month of the REQUESTED date (Mauritius
+  // calendar), not the current month — next-month dates must stay bookable
+  // when this month's quota is used up.
   const monthlyFull = calculateMonthlyUsage(
     bookings,
     business.plan,
     business.bookingLimitMonthly,
+    new Date(isoFromMauritiusLocal(date, "12:00")),
   ).full;
 
   return generateSlots({
@@ -578,8 +614,51 @@ export async function getAvailableSlots(
   });
 }
 
-export async function createBooking(input: BookingInput): Promise<Booking> {
-  if (!isD1Enabled()) return createDevBooking(input);
+function validateBookingInput(input: BookingInput, options: { phoneRequired: boolean }) {
+  const name = input.customerName?.trim() ?? "";
+  if (name.length < 2 || name.length > 80) {
+    throw new Error("Enter the customer's name (2–80 characters).");
+  }
+  const rawPhone = input.customerPhone?.trim() ?? "";
+  let phone = "";
+  if (rawPhone || options.phoneRequired) {
+    const error = validateWhatsAppNumber(rawPhone);
+    if (error) throw new Error(error);
+    phone = normalizeWhatsAppNumber(rawPhone);
+  }
+  if (!input.startAt || Number.isNaN(new Date(input.startAt).getTime())) {
+    throw new Error("Invalid booking time. Please pick a slot again.");
+  }
+  if (input.notes && input.notes.length > 500) {
+    throw new Error("Notes are too long (max 500 characters).");
+  }
+  const language: BookingLanguage = ["English", "Francais", "Both"].includes(input.customerLanguage)
+    ? input.customerLanguage
+    : "Both";
+  return { name, phone, language };
+}
+
+type CreateBookingOptions = {
+  source?: "public" | "dashboard";
+  /** Owner-entered bookings skip the notice/advance-window rules. */
+  skipBookingRules?: boolean;
+};
+
+export async function createBooking(
+  input: BookingInput,
+  options: CreateBookingOptions = {},
+): Promise<Booking> {
+  const source = options.source ?? "public";
+  const clean = validateBookingInput(input, { phoneRequired: source === "public" });
+
+  if (!isD1Enabled()) {
+    return createDevBooking({
+      ...input,
+      customerName: clean.name,
+      customerPhone: clean.phone,
+      customerLanguage: clean.language,
+    });
+  }
 
   const db = getD1()!;
 
@@ -599,22 +678,24 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
   const business = bizRow ? mapBusiness(bizRow) : null;
   if (business) {
     // Enforce the owner's booking rules server-side.
-    const startMsCheck = new Date(input.startAt).getTime();
-    const nowMs = Date.now();
-    if (startMsCheck - nowMs < business.minNoticeMinutes * 60_000) {
-      throw new Error("This time is too soon. The business needs more notice — pick a later slot.");
-    }
-    if (startMsCheck > nowMs + business.maxAdvanceDays * 24 * 3600 * 1000) {
-      throw new Error(
-        `Bookings can only be made up to ${business.maxAdvanceDays} days in advance.`,
-      );
+    if (!options.skipBookingRules) {
+      const startMsCheck = new Date(input.startAt).getTime();
+      const nowMs = Date.now();
+      if (startMsCheck - nowMs < business.minNoticeMinutes * 60_000) {
+        throw new Error(
+          "This time is too soon. The business needs more notice — pick a later slot.",
+        );
+      }
+      if (startMsCheck > nowMs + business.maxAdvanceDays * 24 * 3600 * 1000) {
+        throw new Error(
+          `Bookings can only be made up to ${business.maxAdvanceDays} days in advance.`,
+        );
+      }
     }
 
     if (business.plan === "free" && business.bookingLimitMonthly) {
-      const monthStart = input.startAt.slice(0, 7) + "-01T00:00:00.000Z";
-      const monthEnd =
-        new Date(new Date(monthStart).getTime() + 32 * 24 * 3600 * 1000).toISOString().slice(0, 7) +
-        "-01T00:00:00.000Z";
+      // Same Mauritius-month bucket the dashboard and slot grid use.
+      const { start: monthStart, end: monthEnd } = mauritiusMonthBounds(input.startAt);
       const countRow = await d1First<{ count: number }>(
         db
           .prepare(
@@ -668,18 +749,19 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
       INSERT INTO bookings
         (id, business_id, service_id, customer_name, customer_phone,
          customer_language, start_at, end_at, status, source, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'public', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
     `,
       )
       .bind(
         id,
         input.businessId,
         input.serviceId,
-        input.customerName.trim(),
-        input.customerPhone.trim(),
-        input.customerLanguage,
+        clean.name,
+        clean.phone,
+        clean.language,
         input.startAt,
         endAt,
+        source,
         input.notes ?? null,
       ),
   );
@@ -692,13 +774,13 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
     servicePriceLabel: service.priceLabel,
     businessName: business?.name,
     businessSlug: business?.slug,
-    customerName: input.customerName.trim(),
-    customerPhone: input.customerPhone.trim(),
-    customerLanguage: input.customerLanguage,
+    customerName: clean.name,
+    customerPhone: clean.phone,
+    customerLanguage: clean.language,
     startAt: input.startAt,
     endAt,
     status: "pending",
-    source: "public",
+    source,
     notes: input.notes,
     createdAt: new Date().toISOString(),
   };
@@ -713,17 +795,21 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
       dateLabel: formatDateLabel(input.startAt, { year: "numeric" }),
       timeLabel: formatTimeLabel(input.startAt),
       bookingUrl: `${siteUrlFromEnv()}/b/${business.slug}/confirmed?bookingId=${booking.id}`,
-      language: input.customerLanguage,
+      language: clean.language,
     };
 
     await Promise.allSettled([
-      sendTemplatedBookingConfirmation({
-        businessId: business.id,
-        bookingId: booking.id,
-        to: booking.customerPhone,
-        booking: bookingContext,
-      }),
-      business.whatsappNumber
+      // Customer confirmation needs a phone (owner-entered bookings may omit it).
+      booking.customerPhone
+        ? sendTemplatedBookingConfirmation({
+            businessId: business.id,
+            bookingId: booking.id,
+            to: booking.customerPhone,
+            booking: bookingContext,
+          })
+        : Promise.resolve(),
+      // No owner alert for bookings the owner entered themselves.
+      business.whatsappNumber && source === "public"
         ? sendTemplatedOwnerBookingAlert({
             businessId: business.id,
             bookingId: booking.id,
@@ -739,6 +825,24 @@ export async function createBooking(input: BookingInput): Promise<Booking> {
 
   saveLastBooking(booking);
   return booking;
+}
+
+/**
+ * Owner-entered booking from the dashboard (walk-in / phone booking).
+ * Verifies ownership; skips the notice/advance-window rules but still
+ * enforces overlap and the monthly plan limit.
+ */
+export async function createOwnerBooking(input: BookingInput, ownerId: string): Promise<Booking> {
+  if (isD1Enabled()) {
+    await ensureBusinessOwner(getD1()!, input.businessId, ownerId);
+  }
+  return createBooking(input, { source: "dashboard", skipBookingRules: true });
+}
+
+/** Ownership guard for routes outside this module (e.g. Stripe checkout). */
+export async function assertBusinessOwnership(businessId: string, ownerId: string): Promise<void> {
+  if (!isD1Enabled()) return;
+  await ensureBusinessOwner(getD1()!, businessId, ownerId);
 }
 
 export async function getBookingById(id: string): Promise<Booking | null> {

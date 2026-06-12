@@ -1,4 +1,4 @@
-# Reservly Post-Launch Backlog
+# Rezavu Post-Launch Backlog
 
 These items are intentionally deferred until the Cloudflare D1/KV launch path is live and verified.
 

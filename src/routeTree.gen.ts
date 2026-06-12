@@ -30,6 +30,7 @@ import { Route as ApiPublicBookingsRouteImport } from './routes/api.public.booki
 import { Route as ApiPublicBookingRouteImport } from './routes/api.public.booking'
 import { Route as ApiDashboardServiceRouteImport } from './routes/api.dashboard.service'
 import { Route as ApiDashboardDataRouteImport } from './routes/api.dashboard.data'
+import { Route as ApiDashboardCreateBookingRouteImport } from './routes/api.dashboard.create-booking'
 import { Route as ApiDashboardBusinessRouteImport } from './routes/api.dashboard.business'
 import { Route as ApiDashboardBookingActionRouteImport } from './routes/api.dashboard.booking-action'
 import { Route as ApiDashboardAvailabilityRouteImport } from './routes/api.dashboard.availability'
@@ -37,6 +38,7 @@ import { Route as ApiAuthSignupRouteImport } from './routes/api.auth.signup'
 import { Route as ApiAuthSignoutRouteImport } from './routes/api.auth.signout'
 import { Route as ApiAuthSigninRouteImport } from './routes/api.auth.signin'
 import { Route as ApiAuthMeRouteImport } from './routes/api.auth.me'
+import { Route as ApiAuthDeleteAccountRouteImport } from './routes/api.auth.delete-account'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -143,6 +145,12 @@ const ApiDashboardDataRoute = ApiDashboardDataRouteImport.update({
   path: '/api/dashboard/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDashboardCreateBookingRoute =
+  ApiDashboardCreateBookingRouteImport.update({
+    id: '/api/dashboard/create-booking',
+    path: '/api/dashboard/create-booking',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDashboardBusinessRoute = ApiDashboardBusinessRouteImport.update({
   id: '/api/dashboard/business',
   path: '/api/dashboard/business',
@@ -180,6 +188,11 @@ const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
   path: '/me',
   getParentRoute: () => ApiAuthRoute,
 } as any)
+const ApiAuthDeleteAccountRoute = ApiAuthDeleteAccountRouteImport.update({
+  id: '/delete-account',
+  path: '/delete-account',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -193,6 +206,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
@@ -200,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
   '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
   '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/create-booking': typeof ApiDashboardCreateBookingRoute
   '/api/dashboard/data': typeof ApiDashboardDataRoute
   '/api/dashboard/service': typeof ApiDashboardServiceRoute
   '/api/public/booking': typeof ApiPublicBookingRoute
@@ -222,6 +237,7 @@ export interface FileRoutesByTo {
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
@@ -229,6 +245,7 @@ export interface FileRoutesByTo {
   '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
   '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
   '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/create-booking': typeof ApiDashboardCreateBookingRoute
   '/api/dashboard/data': typeof ApiDashboardDataRoute
   '/api/dashboard/service': typeof ApiDashboardServiceRoute
   '/api/public/booking': typeof ApiPublicBookingRoute
@@ -253,6 +270,7 @@ export interface FileRoutesById {
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
@@ -260,6 +278,7 @@ export interface FileRoutesById {
   '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
   '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
   '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/create-booking': typeof ApiDashboardCreateBookingRoute
   '/api/dashboard/data': typeof ApiDashboardDataRoute
   '/api/dashboard/service': typeof ApiDashboardServiceRoute
   '/api/public/booking': typeof ApiPublicBookingRoute
@@ -285,6 +304,7 @@ export interface FileRouteTypes {
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/auth/delete-account'
     | '/api/auth/me'
     | '/api/auth/signin'
     | '/api/auth/signout'
@@ -292,6 +312,7 @@ export interface FileRouteTypes {
     | '/api/dashboard/availability'
     | '/api/dashboard/booking-action'
     | '/api/dashboard/business'
+    | '/api/dashboard/create-booking'
     | '/api/dashboard/data'
     | '/api/dashboard/service'
     | '/api/public/booking'
@@ -314,6 +335,7 @@ export interface FileRouteTypes {
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard'
+    | '/api/auth/delete-account'
     | '/api/auth/me'
     | '/api/auth/signin'
     | '/api/auth/signout'
@@ -321,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/dashboard/availability'
     | '/api/dashboard/booking-action'
     | '/api/dashboard/business'
+    | '/api/dashboard/create-booking'
     | '/api/dashboard/data'
     | '/api/dashboard/service'
     | '/api/public/booking'
@@ -344,6 +367,7 @@ export interface FileRouteTypes {
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/auth/delete-account'
     | '/api/auth/me'
     | '/api/auth/signin'
     | '/api/auth/signout'
@@ -351,6 +375,7 @@ export interface FileRouteTypes {
     | '/api/dashboard/availability'
     | '/api/dashboard/booking-action'
     | '/api/dashboard/business'
+    | '/api/dashboard/create-booking'
     | '/api/dashboard/data'
     | '/api/dashboard/service'
     | '/api/public/booking'
@@ -375,6 +400,7 @@ export interface RootRouteChildren {
   ApiDashboardAvailabilityRoute: typeof ApiDashboardAvailabilityRoute
   ApiDashboardBookingActionRoute: typeof ApiDashboardBookingActionRoute
   ApiDashboardBusinessRoute: typeof ApiDashboardBusinessRoute
+  ApiDashboardCreateBookingRoute: typeof ApiDashboardCreateBookingRoute
   ApiDashboardDataRoute: typeof ApiDashboardDataRoute
   ApiDashboardServiceRoute: typeof ApiDashboardServiceRoute
   ApiPublicBookingRoute: typeof ApiPublicBookingRoute
@@ -536,6 +562,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDashboardDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dashboard/create-booking': {
+      id: '/api/dashboard/create-booking'
+      path: '/api/dashboard/create-booking'
+      fullPath: '/api/dashboard/create-booking'
+      preLoaderRoute: typeof ApiDashboardCreateBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/dashboard/business': {
       id: '/api/dashboard/business'
       path: '/api/dashboard/business'
@@ -585,6 +618,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthMeRouteImport
       parentRoute: typeof ApiAuthRoute
     }
+    '/api/auth/delete-account': {
+      id: '/api/auth/delete-account'
+      path: '/delete-account'
+      fullPath: '/api/auth/delete-account'
+      preLoaderRoute: typeof ApiAuthDeleteAccountRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
   }
 }
 
@@ -605,6 +645,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 )
 
 interface ApiAuthRouteChildren {
+  ApiAuthDeleteAccountRoute: typeof ApiAuthDeleteAccountRoute
   ApiAuthMeRoute: typeof ApiAuthMeRoute
   ApiAuthSigninRoute: typeof ApiAuthSigninRoute
   ApiAuthSignoutRoute: typeof ApiAuthSignoutRoute
@@ -612,6 +653,7 @@ interface ApiAuthRouteChildren {
 }
 
 const ApiAuthRouteChildren: ApiAuthRouteChildren = {
+  ApiAuthDeleteAccountRoute: ApiAuthDeleteAccountRoute,
   ApiAuthMeRoute: ApiAuthMeRoute,
   ApiAuthSigninRoute: ApiAuthSigninRoute,
   ApiAuthSignoutRoute: ApiAuthSignoutRoute,
@@ -633,6 +675,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDashboardAvailabilityRoute: ApiDashboardAvailabilityRoute,
   ApiDashboardBookingActionRoute: ApiDashboardBookingActionRoute,
   ApiDashboardBusinessRoute: ApiDashboardBusinessRoute,
+  ApiDashboardCreateBookingRoute: ApiDashboardCreateBookingRoute,
   ApiDashboardDataRoute: ApiDashboardDataRoute,
   ApiDashboardServiceRoute: ApiDashboardServiceRoute,
   ApiPublicBookingRoute: ApiPublicBookingRoute,

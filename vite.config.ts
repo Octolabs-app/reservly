@@ -9,7 +9,8 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   nitro: {
     preset: "cloudflare_pages",
-    output: { dir: "dist", serverDir: "dist/server", publicDir: "dist/client" },
+    // No output override: the cloudflare_pages preset must emit dist/_worker.js
+    // at the deploy root or Pages serves a static-only (dead) site.
     cloudflare: { nodeCompat: true, deployConfig: true },
   },
   tanstackStart: {

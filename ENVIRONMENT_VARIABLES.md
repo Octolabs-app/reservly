@@ -1,31 +1,34 @@
 # Environment Variables
 
-Never commit real secrets. Use `.env.local` locally and your deployment provider's secret storage in production.
+Never commit real secrets. Locally, nothing is required (the dev store runs
+without credentials). In production, set non-secret vars in `wrangler.toml`
+`[vars]` / the Pages dashboard, and secrets via
+`wrangler pages secret put <NAME> --project-name=rezavu`.
 
-## Required
+## Server (Cloudflare Pages bindings + vars)
 
-| Variable                      | Purpose                                                      |
-| ----------------------------- | ------------------------------------------------------------ |
-| `SUPABASE_URL`                | Supabase project URL for server-side code.                   |
-| `SUPABASE_ANON_KEY`           | Supabase publishable or legacy anon key.                     |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Server-only Supabase secret/service role key.                |
-| `TWILIO_ACCOUNT_SID`          | Twilio account SID.                                          |
-| `TWILIO_AUTH_TOKEN`           | Twilio auth token.                                           |
-| `TWILIO_WHATSAPP_FROM`        | Twilio WhatsApp sender, for example `whatsapp:+14155238886`. |
-| `STRIPE_SECRET_KEY`           | Stripe secret key.                                           |
-| `STRIPE_WEBHOOK_SECRET`       | Stripe webhook signing secret.                               |
-| `STRIPE_PRICE_PRO_MONTHLY`    | Stripe recurring price ID for Pro.                           |
-| `STRIPE_PRICE_STUDIO_MONTHLY` | Stripe recurring price ID for Studio.                        |
-| `SITE_URL`                    | Public site URL, without a trailing slash.                   |
+| Variable                      | Required | Purpose                                                       |
+| ----------------------------- | -------- | ------------------------------------------------------------- |
+| `DB` (D1 binding)             | yes      | Cloudflare D1 database (`rezavu-db`).                          |
+| `KV` (KV binding)             | yes      | Session cache + rate-limit counters (`rezavu-sessions`).       |
+| `SITE_URL`                    | yes      | Public site URL, no trailing slash (`https://rezavu.octolabs.app`). Used in WhatsApp links, Stripe redirects, Twilio signature validation. |
+| `TWILIO_ACCOUNT_SID`          | no\*     | Twilio account SID.                                            |
+| `TWILIO_AUTH_TOKEN`           | no\*     | Twilio auth token — also validates inbound webhook signatures. |
+| `TWILIO_WHATSAPP_FROM`        | no\*     | WhatsApp sender, e.g. `whatsapp:+14155238886`.                 |
+| `STRIPE_SECRET_KEY`           | no\*     | Stripe secret key.                                             |
+| `STRIPE_WEBHOOK_SECRET`       | no\*     | Stripe webhook signing secret.                                 |
+| `STRIPE_PRICE_PRO_MONTHLY`    | no\*     | Stripe recurring price ID for Pro.                             |
+| `STRIPE_PRICE_STUDIO_MONTHLY` | no\*     | Stripe recurring price ID for Studio.                          |
 
-## Vite Client Aliases
+\* Optional at launch: without Twilio vars, messages are logged instead of
+sent; without Stripe vars, upgrade buttons show a clean "coming soon" notice.
 
-The browser Supabase client also reads:
+## Build-time (Vite, baked into the client bundle)
 
-| Variable                 | Purpose                                     |
-| ------------------------ | ------------------------------------------- |
-| `VITE_SUPABASE_URL`      | Supabase URL exposed to the client.         |
-| `VITE_SUPABASE_ANON_KEY` | Publishable/anon key exposed to the client. |
-| `VITE_SITE_URL`          | Public URL exposed to the client.           |
+| Variable        | Purpose                                                                  |
+| --------------- | ------------------------------------------------------------------------ |
+| `VITE_SITE_URL` | Public URL the client renders in share links and the booking-link panel. Set it in the Pages build environment, then redeploy. |
 
-Supabase's current key model prefers publishable keys for client-side use and secret keys for trusted backends.
+There are no Supabase variables — the Supabase backend was fully replaced by
+Cloudflare D1/KV. There is no `SESSION_SECRET` — sessions are random UUIDs
+stored server-side, nothing is signed.

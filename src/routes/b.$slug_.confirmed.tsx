@@ -1,14 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
 import { getBookingById } from "@/lib/cf/client-data";
-import { getLastBooking } from "@/lib/reservly/dev-store";
-import { formatDateLabel, formatTimeLabel } from "@/lib/reservly/slots";
-import type { Booking } from "@/lib/reservly/types";
+import { getLastBooking } from "@/lib/rezavu/dev-store";
+import { t, type PageLang } from "@/lib/rezavu/i18n";
+import { formatDateLabel, formatTimeLabel } from "@/lib/rezavu/slots";
+import type { Booking } from "@/lib/rezavu/types";
 
 export const Route = createFileRoute("/b/$slug_/confirmed")({
   head: () => ({
-    meta: [{ title: "Booking confirmed | Reservly" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Booking confirmed — Rezavu" }, { name: "robots", content: "noindex" }],
   }),
   component: ConfirmedPage,
 });
@@ -16,14 +17,15 @@ export const Route = createFileRoute("/b/$slug_/confirmed")({
 function ConfirmedPage() {
   const { slug } = Route.useParams();
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [resolved, setResolved] = useState(false);
   const [show, setShow] = useState(false);
-  const bookingId =
-    typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("bookingId")
-      : null;
+
+  const search = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const bookingId = search?.get("bookingId") ?? null;
+  const lang: PageLang = search?.get("lang") === "fr" ? "fr" : "en";
 
   useEffect(() => {
-    const t = setTimeout(() => setShow(true), 80);
+    const timer = setTimeout(() => setShow(true), 80);
     if (bookingId) {
       // The booking we just created is cached in sessionStorage — show it
       // instantly and let the API result replace it when available.
@@ -33,21 +35,26 @@ function ConfirmedPage() {
         .then((result) => {
           if (result) setBooking(result);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setResolved(true));
+    } else {
+      setResolved(true);
     }
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   }, [bookingId]);
 
   const businessName =
     booking?.businessName ??
     slug.replace(/-/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
-  const rows: Array<[string, string]> = [
-    ["Business", businessName],
-    ["Service", booking?.serviceName ?? "Selected service"],
-    ["Date", booking ? formatDateLabel(booking.startAt, { year: "numeric" }) : "Confirmed"],
-    ["Time", booking ? formatTimeLabel(booking.startAt) : "Confirmed"],
-  ];
-  if (booking?.servicePriceLabel) rows.push(["Price", booking.servicePriceLabel]);
+  const rows: Array<[string, string]> = booking
+    ? [
+        [t("rowBusiness", lang), businessName],
+        [t("rowService", lang), booking.serviceName ?? "—"],
+        [t("rowDate", lang), formatDateLabel(booking.startAt, { year: "numeric" })],
+        [t("rowTime", lang), formatTimeLabel(booking.startAt)],
+      ]
+    : [];
+  if (booking?.servicePriceLabel) rows.push([t("rowPrice", lang), booking.servicePriceLabel]);
 
   return (
     <>
@@ -55,7 +62,7 @@ function ConfirmedPage() {
       <Page width="sm">
         <Panel className="overflow-hidden">
           <div className="bg-success px-5 py-3.5">
-            <span className="text-sm font-bold text-white">Booking received</span>
+            <span className="text-sm font-bold text-white">{t("bookingReceived", lang)}</span>
           </div>
           <div className="px-6 pb-7 pt-9 text-center">
             <div
@@ -69,55 +76,72 @@ function ConfirmedPage() {
               ✓
             </div>
 
-            <h1 className="text-[22px] font-bold tracking-tight text-foreground">You're booked!</h1>
-            <p className="mt-1 text-[13px] text-muted-foreground">See you at {businessName}.</p>
+            <h1 className="text-[22px] font-bold tracking-tight text-foreground">
+              {t("youreBooked", lang)}
+            </h1>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              {t("seeYouAt", lang)} {businessName}.
+            </p>
 
-            <div className="mt-6 rounded-xl border border-border bg-white px-4 py-1.5 text-left shadow-xs">
-              {rows.map(([key, value], index) => (
-                <div
-                  key={key}
-                  className={`flex items-center justify-between gap-4 py-2.5 ${
-                    index < rows.length - 1 ? "border-b border-border/70" : ""
-                  }`}
-                >
-                  <span className="text-[13px] text-muted-foreground">{key}</span>
-                  <span className="text-right text-[13px] font-semibold text-foreground">
-                    {value}
-                  </span>
+            {booking ? (
+              <div className="mt-6 rounded-xl border border-border bg-white px-4 py-1.5 text-left shadow-xs">
+                {rows.map(([key, value], index) => (
+                  <div
+                    key={key}
+                    className={`flex items-center justify-between gap-4 py-2.5 ${
+                      index < rows.length - 1 ? "border-b border-border/70" : ""
+                    }`}
+                  >
+                    <span className="text-[13px] text-muted-foreground">{key}</span>
+                    <span className="text-right text-[13px] font-semibold text-foreground">
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              resolved && (
+                <div className="mt-6 rounded-xl bg-surface px-4 py-3.5 text-[13px] text-muted-foreground">
+                  {t("detailsInWhatsApp", lang)}
                 </div>
-              ))}
-            </div>
+              )
+            )}
 
             <div className="mt-4 flex items-center justify-center gap-2 rounded-[10px] border border-wa/25 bg-wa-soft px-4 py-2.5 text-[13px] text-success">
               <span className="text-base">💬</span>
               <span>
-                Confirmation sent on WhatsApp
-                {booking?.customerPhone ? ` to ${booking.customerPhone}` : ""}
+                {t("waSent", lang)}
+                {booking?.customerPhone ? ` · ${booking.customerPhone}` : ""}
               </span>
             </div>
 
             <div className="mt-4 rounded-lg bg-surface px-3.5 py-2.5 text-left text-xs leading-relaxed text-muted-foreground">
-              📅 Keep an eye on WhatsApp — the business will confirm your booking there. Reply{" "}
-              <strong>CANCEL</strong> if you need to cancel.
+              📅 {t("reminderNote", lang)}
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-2.5">
-              <a
-                href={
-                  booking
-                    ? `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-                        `Booking at ${businessName}`,
-                      )}&dates=${calendarDate(booking.startAt)}/${calendarDate(booking.endAt)}`
-                    : "#"
-                }
-                target="_blank"
-                rel="noreferrer"
-                className="btn-frame"
-              >
-                Add to calendar
-              </a>
+              {booking ? (
+                <a
+                  href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
+                    `Booking at ${businessName}`,
+                  )}&dates=${calendarDate(booking.startAt)}/${calendarDate(booking.endAt)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-frame"
+                >
+                  {t("addToCalendar", lang)}
+                </a>
+              ) : (
+                <span
+                  aria-disabled="true"
+                  className="btn-frame cursor-not-allowed opacity-50"
+                  title={t("detailsInWhatsApp", lang)}
+                >
+                  {t("addToCalendar", lang)}
+                </span>
+              )}
               <Link to="/b/$slug" params={{ slug }} className="btn-frame-primary">
-                New booking
+                {t("newBooking", lang)}
               </Link>
             </div>
 
@@ -126,7 +150,7 @@ function ConfirmedPage() {
                 to="/"
                 className="text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                Powered by Reservly →
+                Powered by Rezavu →
               </Link>
             </div>
           </div>

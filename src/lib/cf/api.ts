@@ -1,5 +1,5 @@
 import { getCurrentOwner } from "./auth";
-import type { Owner } from "@/lib/reservly/types";
+import type { Owner } from "@/lib/rezavu/types";
 
 export function jsonError(error: unknown, status = 400) {
   return Response.json(

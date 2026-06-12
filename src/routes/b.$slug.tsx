@@ -1,15 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
 import { createBooking, getAvailableSlots, getPublicBusinessBySlug } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/reservly/env";
-import { addDays, dateInputFromDate } from "@/lib/reservly/slots";
-import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/reservly/types";
+import { getSiteUrl } from "@/lib/rezavu/env";
+import {
+  defaultPageLang,
+  showsLangToggle,
+  slotReasonLabel,
+  t,
+  type PageLang,
+} from "@/lib/rezavu/i18n";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
+import { addDaysToDateInput, mauritiusTodayInput } from "@/lib/rezavu/slots";
+import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/rezavu/types";
 
 export const Route = createFileRoute("/b/$slug")({
   head: ({ params }) => ({
     meta: [
-      { title: `Book with ${params.slug.replace(/-/g, " ")} - Reservly` },
+      { title: `Book with ${params.slug.replace(/-/g, " ")} — Rezavu` },
       {
         name: "description",
         content: "Pick a service and time. Confirmation arrives straight on WhatsApp.",
@@ -29,13 +37,21 @@ const CATEGORY_ICONS: Record<string, string> = {
   Other: "⭐",
 };
 
-const SLOT_REASON_LABEL: Record<NonNullable<Slot["reason"]>, string> = {
-  past: "This time has passed",
-  taken: "Already booked",
-  full: "Online booking is full this month",
-  notice: "Too soon — the business needs more notice",
-  closed: "Closed",
-};
+function dateChip(value: string, lang: PageLang) {
+  const display = new Date(`${value}T12:00:00+04:00`);
+  const locale = lang === "fr" ? "fr-FR" : "en-GB";
+  return {
+    value,
+    day: display.toLocaleDateString(locale, { weekday: "short", timeZone: "Indian/Mauritius" }),
+    num: display.toLocaleDateString("en-GB", { day: "numeric", timeZone: "Indian/Mauritius" }),
+    full: display.toLocaleDateString(locale, {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      timeZone: "Indian/Mauritius",
+    }),
+  };
+}
 
 function BookingPage() {
   const { slug } = Route.useParams();
@@ -50,26 +66,17 @@ function BookingPage() {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState<BookingLanguage>("Both");
+  const [pageLang, setPageLang] = useState<PageLang>("en");
   const [submitting, setSubmitting] = useState(false);
 
+  const langSetting = data?.business.bookingPageLanguage;
   const maxDays = Math.min(data?.business.maxAdvanceDays ?? 14, 30);
-  const dates = useMemo(
-    () =>
-      Array.from({ length: maxDays }, (_, index) => {
-        const next = addDays(new Date(), index);
-        return {
-          value: dateInputFromDate(next),
-          day: next.toLocaleDateString("en-GB", { weekday: "short" }),
-          num: next.getDate(),
-          full: next.toLocaleDateString("en-GB", {
-            weekday: "short",
-            day: "2-digit",
-            month: "short",
-          }),
-        };
-      }),
-    [maxDays],
-  );
+  const dates = useMemo(() => {
+    const today = mauritiusTodayInput();
+    return Array.from({ length: maxDays }, (_, index) =>
+      dateChip(addDaysToDateInput(today, index), pageLang),
+    );
+  }, [maxDays, pageLang]);
 
   useEffect(() => {
     setLoading(true);
@@ -77,7 +84,11 @@ function BookingPage() {
       .then((result) => {
         setData(result);
         setServiceId(result?.services[0]?.id ?? "");
-        setDate(dateInputFromDate(new Date()));
+        setDate(mauritiusTodayInput());
+        if (result) {
+          setPageLang(defaultPageLang(result.business.bookingPageLanguage));
+          setLanguage(result.business.bookingPageLanguage);
+        }
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Booking page failed to load."))
       .finally(() => setLoading(false));
@@ -87,10 +98,21 @@ function BookingPage() {
     if (!data || !serviceId || !date) return;
     setSelectedSlot(null);
     setSlotsLoading(true);
+    // Stale-response guard: rapid date taps must not render an older response.
+    let active = true;
     getAvailableSlots(data.business.id, serviceId, date)
-      .then(setSlots)
-      .catch((err) => setError(err instanceof Error ? err.message : "Slots failed to load."))
-      .finally(() => setSlotsLoading(false));
+      .then((result) => {
+        if (active) setSlots(result);
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : "Slots failed to load.");
+      })
+      .finally(() => {
+        if (active) setSlotsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [data, serviceId, date]);
 
   const service = data?.services.find((entry) => entry.id === serviceId) ?? null;
@@ -103,6 +125,7 @@ function BookingPage() {
     (name.trim() && phone.trim() && !phoneValidation ? 1 : 0);
   const selectedDate = dates.find((entry) => entry.value === date);
   const siteHost = getSiteUrl().replace(/^https?:\/\//, "");
+  const hasUnavailable = slots.some((slot) => !slot.available);
 
   async function confirm() {
     if (!data || !service || !selectedSlot || !ready) return;
@@ -117,7 +140,7 @@ function BookingPage() {
         customerLanguage: language,
         startAt: selectedSlot.startAt,
       });
-      window.location.href = `/b/${data.business.slug}/confirmed?bookingId=${booking.id}`;
+      window.location.href = `/b/${data.business.slug}/confirmed?bookingId=${booking.id}&lang=${pageLang}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Booking could not be created.");
     } finally {
@@ -134,20 +157,36 @@ function BookingPage() {
         {!loading && !data && (
           <Panel className="p-8 text-center">
             <div className="mb-3 text-4xl">🔍</div>
-            <h1 className="text-lg font-bold text-foreground">This booking page is unavailable.</h1>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              Check the link with the business, or try again later.
-            </p>
+            <h1 className="text-lg font-bold text-foreground">{t("notFoundTitle", pageLang)}</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">{t("notFoundSub", pageLang)}</p>
           </Panel>
         )}
 
         {data && (
           <Panel className="overflow-hidden">
-            {/* URL bar */}
-            <div className="flex items-center justify-between bg-ink px-4 py-2.5">
+            {/* URL bar + language toggle */}
+            <div className="flex items-center justify-between gap-3 bg-ink px-4 py-2.5">
               <span className="truncate font-mono text-[11px] text-white/50">
                 {siteHost}/b/{data.business.slug}
               </span>
+              {showsLangToggle(langSetting) && (
+                <div className="flex gap-1" role="group" aria-label="Page language">
+                  {(["en", "fr"] as PageLang[]).map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={() => setPageLang(lang)}
+                      aria-pressed={pageLang === lang}
+                      className={`rounded px-2 py-1 text-[11px] font-semibold transition-colors ${
+                        pageLang === lang
+                          ? "bg-white/20 text-white"
+                          : "text-white/40 hover:text-white/70"
+                      }`}
+                    >
+                      {lang.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Progress */}
@@ -181,7 +220,7 @@ function BookingPage() {
             <div className="space-y-7 px-5 pb-6 pt-5">
               {data.usage.full && (
                 <div className="rounded-lg border border-warning/30 bg-warning-soft px-3.5 py-2.5 text-sm text-warning">
-                  Online booking is full for this month. Please contact the business on WhatsApp.
+                  {t("monthFull", pageLang)}
                 </div>
               )}
 
@@ -192,13 +231,14 @@ function BookingPage() {
               )}
 
               {/* 1 — Service */}
-              <Section label="1 — Pick a service">
+              <Section label={t("pickService", pageLang)}>
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                   {data.services.map((entry) => (
                     <ServiceButton
                       key={entry.id}
                       service={entry}
                       active={entry.id === serviceId}
+                      lang={pageLang}
                       onClick={() => setServiceId(entry.id)}
                     />
                   ))}
@@ -206,7 +246,7 @@ function BookingPage() {
               </Section>
 
               {/* 2 — Date */}
-              <Section label="2 — Pick a date">
+              <Section label={t("pickDate", pageLang)}>
                 <div className="flex gap-1.5 overflow-x-auto pb-1.5">
                   {dates.map((entry) => {
                     const active = date === entry.value;
@@ -214,6 +254,8 @@ function BookingPage() {
                       <button
                         key={entry.value}
                         onClick={() => setDate(entry.value)}
+                        aria-pressed={active}
+                        aria-label={entry.full}
                         className={`min-w-[52px] shrink-0 rounded-xl border-[1.5px] px-1.5 py-2 text-center transition-all ${
                           active
                             ? "border-primary bg-primary text-white"
@@ -239,7 +281,9 @@ function BookingPage() {
               </Section>
 
               {/* 3 — Time */}
-              <Section label={service?.allDay ? "3 — Confirm the day" : "3 — Pick a time"}>
+              <Section
+                label={service?.allDay ? t("confirmDay", pageLang) : t("pickTime", pageLang)}
+              >
                 {slotsLoading ? (
                   <div className="grid grid-cols-3 gap-1.5">
                     {[0, 1, 2, 3, 4, 5].map((item) => (
@@ -248,7 +292,7 @@ function BookingPage() {
                   </div>
                 ) : slots.length === 0 ? (
                   <div className="rounded-lg border border-border bg-surface px-3.5 py-3 text-[13px] text-muted-foreground">
-                    No slots on this date — try another day.
+                    {t("noSlots", pageLang)}
                   </div>
                 ) : (
                   <div
@@ -260,12 +304,16 @@ function BookingPage() {
                   >
                     {slots.map((slot) => {
                       const active = selectedSlot?.startAt === slot.startAt;
+                      const reasonText = slot.reason
+                        ? slotReasonLabel(slot.reason, pageLang)
+                        : undefined;
                       return (
                         <button
                           key={slot.startAt}
                           disabled={!slot.available}
                           onClick={() => setSelectedSlot(slot)}
-                          title={slot.reason ? SLOT_REASON_LABEL[slot.reason] : undefined}
+                          aria-pressed={active}
+                          title={reasonText}
                           className={`rounded-[10px] border-[1.5px] py-2.5 text-center text-[13px] transition-all ${
                             !slot.available
                               ? "cursor-not-allowed border-border bg-surface text-muted-foreground/50 line-through opacity-60"
@@ -274,34 +322,47 @@ function BookingPage() {
                                 : "border-border bg-white text-foreground hover:border-primary-mid"
                           }`}
                         >
-                          {slot.time}
+                          {slot.time === "All day" ? t("allDay", pageLang) : slot.time}
+                          {reasonText && <span className="sr-only"> — {reasonText}</span>}
                         </button>
                       );
                     })}
                   </div>
                 )}
+                {hasUnavailable && !slotsLoading && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    {t("slotLegend", pageLang)}
+                  </p>
+                )}
                 {service?.allDay && slots.some((slot) => slot.available) && (
                   <p className="mt-2 text-[11px] text-muted-foreground">
-                    This service takes the whole day — one booking per date.
+                    {t("allDayNote", pageLang)}
                   </p>
                 )}
               </Section>
 
               {/* 4 — Details */}
-              <Section label="4 — Your details">
+              <Section label={t("yourDetails", pageLang)}>
                 <div className="space-y-3.5">
                   <div>
-                    <label className="kicker mb-1.5 block">Your name *</label>
+                    <label className="kicker mb-1.5 block" htmlFor="booking-name">
+                      {t("yourName", pageLang)}
+                    </label>
                     <input
+                      id="booking-name"
                       value={name}
                       onChange={(event) => setName(event.target.value)}
-                      placeholder="Marie Dupont"
+                      placeholder={t("namePlaceholder", pageLang)}
+                      autoComplete="name"
                       className="input-field"
                     />
                   </div>
                   <div>
-                    <label className="kicker mb-1.5 block">WhatsApp number *</label>
+                    <label className="kicker mb-1.5 block" htmlFor="booking-phone">
+                      {t("whatsappNumber", pageLang)}
+                    </label>
                     <input
+                      id="booking-phone"
                       value={phone}
                       onChange={(event) => setPhone(event.target.value)}
                       onBlur={() => {
@@ -309,6 +370,7 @@ function BookingPage() {
                         if (!validateWhatsAppNumber(normalized)) setPhone(normalized);
                       }}
                       inputMode="tel"
+                      autoComplete="tel"
                       placeholder="+230 5700 0000"
                       className="input-field"
                     />
@@ -321,23 +383,34 @@ function BookingPage() {
                     >
                       {phone.trim() && phoneValidation
                         ? `⚠ ${phoneValidation}`
-                        : "Your confirmation is sent to this number. Mauritius mobiles can be entered as 5XXX XXXX."}
+                        : t("phoneHint", pageLang)}
                     </p>
                   </div>
                   <div>
-                    <div className="kicker mb-2">Language</div>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="kicker mb-2">{t("msgLanguage", pageLang)}</div>
+                    <div
+                      className="grid grid-cols-3 gap-2"
+                      role="group"
+                      aria-label={t("msgLanguage", pageLang)}
+                    >
                       {(["English", "Francais", "Both"] as BookingLanguage[]).map((entry) => (
                         <button
                           key={entry}
                           onClick={() => setLanguage(entry)}
+                          aria-pressed={language === entry}
                           className={`rounded-[10px] border-[1.5px] px-3 py-2 text-[13px] transition-all ${
                             language === entry
                               ? "border-primary bg-primary-soft font-semibold text-primary"
                               : "border-border bg-white text-muted-foreground hover:border-primary-mid"
                           }`}
                         >
-                          {entry === "Francais" ? "Français" : entry}
+                          {entry === "Francais"
+                            ? "Français"
+                            : entry === "Both"
+                              ? pageLang === "fr"
+                                ? "Les deux"
+                                : "Both"
+                              : entry}
                         </button>
                       ))}
                     </div>
@@ -352,7 +425,9 @@ function BookingPage() {
                     <span>📋</span>
                     <span className="font-medium">
                       {service.name} · {selectedDate.full}
-                      {service.allDay ? " (all day)" : ` at ${selectedSlot.time}`}
+                      {service.allDay
+                        ? ` (${t("allDay", pageLang).toLowerCase()})`
+                        : ` · ${selectedSlot.time}`}
                     </span>
                   </div>
                 )}
@@ -362,14 +437,14 @@ function BookingPage() {
                   className={`${ready ? "btn-accent" : "btn-frame"} w-full py-3.5 text-[15px]`}
                 >
                   {submitting
-                    ? "Confirming…"
+                    ? t("confirming", pageLang)
                     : ready
-                      ? "Confirm booking →"
-                      : "Complete all steps above"}
+                      ? t("confirmBooking", pageLang)
+                      : t("completeSteps", pageLang)}
                 </button>
                 <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
                   <span className="text-[13px] text-wa">●</span>
-                  Confirmation via WhatsApp · no account needed
+                  {t("waFootnote", pageLang)}
                 </div>
               </div>
             </div>
@@ -378,21 +453,6 @@ function BookingPage() {
       </Page>
     </>
   );
-}
-
-function normalizeWhatsAppNumber(value: string) {
-  const compact = value.trim().replace(/[()\s-]/g, "");
-  if (/^5\d{7}$/.test(compact)) return `+230${compact}`;
-  return compact;
-}
-
-function validateWhatsAppNumber(value: string) {
-  const normalized = normalizeWhatsAppNumber(value);
-  if (!normalized) return "WhatsApp number is required.";
-  if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
-    return "Enter a valid international WhatsApp number, for example +230 5700 0000.";
-  }
-  return null;
 }
 
 function BookingPageSkeleton() {
@@ -426,15 +486,18 @@ function BookingPageSkeleton() {
 function ServiceButton({
   service,
   active,
+  lang,
   onClick,
 }: {
   service: Service;
   active: boolean;
+  lang: PageLang;
   onClick: () => void;
 }) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={`rounded-xl border-[1.5px] p-3.5 text-left transition-all ${
         active
           ? "border-primary bg-primary-soft shadow-[0_0_0_3px_rgba(27,79,216,0.09)]"
@@ -443,7 +506,9 @@ function ServiceButton({
     >
       <div className="text-[13px] font-semibold text-foreground">{service.name}</div>
       <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>{service.allDay ? "All day" : formatServiceDuration(service.durationMinutes)}</span>
+        <span>
+          {service.allDay ? t("allDay", lang) : formatServiceDuration(service.durationMinutes)}
+        </span>
         {service.priceLabel && (
           <span className="font-semibold text-foreground">{service.priceLabel}</span>
         )}

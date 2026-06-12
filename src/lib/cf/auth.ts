@@ -1,6 +1,6 @@
 // src/lib/cf/auth.ts
 // Owner authentication backed by D1 + KV.
-// Replaces: src/lib/reservly/auth.ts (Supabase GoTrue)
+// Replaces: src/lib/rezavu/auth.ts (Supabase GoTrue)
 //
 // Strategy:
 //   - Passwords stored as bcryptjs hashes in owners.password_hash
@@ -10,10 +10,10 @@
 //   - In local dev (no D1 binding) falls back to the existing dev-store owner
 
 import { getD1, getKV, d1First, d1Run, isD1Enabled } from "./db";
-import { getDevOwner } from "@/lib/reservly/dev-store";
-import type { Owner } from "@/lib/reservly/types";
+import { getDevOwner } from "@/lib/rezavu/dev-store";
+import type { Owner } from "@/lib/rezavu/types";
 
-const SESSION_COOKIE = "rsv_session";
+const SESSION_COOKIE = "rzv_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const KV_TTL_SECONDS = 60 * 60; // 1 hour KV cache
 
@@ -43,11 +43,11 @@ function isExpired(expiresAt: string): boolean {
 // ─── Cookie utilities (server-side, called from server handlers) ──────────────
 
 export function buildSessionCookie(sessionId: string): string {
-  return `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`;
+  return `${SESSION_COOKIE}=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_SECONDS}`;
 }
 
 export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
 export function getSessionIdFromCookieHeader(cookieHeader: string | null): string | null {
@@ -177,6 +177,7 @@ export async function signInOwner(
 export async function signUpOwner(
   email: string,
   password: string,
+  fullName?: string,
 ): Promise<{ owner: Owner; sessionCookie: string }> {
   if (!isD1Enabled()) {
     const owner = await getDevOwner();
@@ -184,8 +185,10 @@ export async function signUpOwner(
   }
 
   const db = getD1()!;
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanName = fullName?.trim() || null;
   const existing = await d1First<{ id: string }>(
-    db.prepare("SELECT id FROM owners WHERE email = ?").bind(email.trim().toLowerCase()),
+    db.prepare("SELECT id FROM owners WHERE email = ?").bind(cleanEmail),
   );
   if (existing) throw new Error("An account with that email already exists.");
 
@@ -193,8 +196,8 @@ export async function signUpOwner(
   const ownerId = crypto.randomUUID();
   await d1Run(
     db
-      .prepare("INSERT INTO owners (id, email, password_hash) VALUES (?, ?, ?)")
-      .bind(ownerId, email.trim().toLowerCase(), hash),
+      .prepare("INSERT INTO owners (id, email, password_hash, full_name) VALUES (?, ?, ?, ?)")
+      .bind(ownerId, cleanEmail, hash, cleanName),
   );
 
   const sessionId = crypto.randomUUID();
@@ -204,8 +207,22 @@ export async function signUpOwner(
       .bind(sessionId, ownerId, sessionExpiresAt()),
   );
 
-  const owner: Owner = { id: ownerId, email: email.trim().toLowerCase(), name: email };
+  const owner: Owner = { id: ownerId, email: cleanEmail, name: cleanName ?? cleanEmail };
   return { owner, sessionCookie: buildSessionCookie(sessionId) };
+}
+
+/**
+ * Permanently delete an owner and (via D1 FK cascades) their businesses,
+ * services, availability, bookings and subscriptions.
+ */
+export async function deleteOwnerAccount(ownerId: string, sessionId: string | null) {
+  if (!isD1Enabled()) return clearSessionCookie();
+
+  const db = getD1()!;
+  const kv = getKV();
+  await d1Run(db.prepare("DELETE FROM owners WHERE id = ?").bind(ownerId));
+  if (sessionId && kv) await kv.delete(`session:${sessionId}`);
+  return clearSessionCookie();
 }
 
 /**

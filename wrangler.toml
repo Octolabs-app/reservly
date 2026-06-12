@@ -1,47 +1,41 @@
 # wrangler.toml
-# Cloudflare Pages + Workers configuration for Reservly.
-# Docs: https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+# Cloudflare Pages configuration for Rezavu.
+# The full deploy runbook lives in DEPLOYMENT.md — follow that, not this header.
 #
-# Setup steps (run once):
-#   1. Install Wrangler:  npm install -g wrangler
-#   2. Login:             wrangler login
-#   3. Create D1:         wrangler d1 create reservly-db
-#      → copy the database_id into [[d1_databases]] below
-#   4. Create KV:         wrangler kv namespace create reservly-sessions
-#      → copy the id into [[kv_namespaces]] below
-#   5. Run migration:     wrangler d1 execute reservly-db --file=migrations/0001_reservly_core.sql
-#   6. Set secrets:       wrangler secret put SESSION_SECRET
-#                         wrangler secret put TWILIO_ACCOUNT_SID
-#                         wrangler secret put TWILIO_AUTH_TOKEN
-#                         wrangler secret put TWILIO_WHATSAPP_FROM
-#                         wrangler secret put STRIPE_SECRET_KEY
-#                         wrangler secret put STRIPE_WEBHOOK_SECRET
-#                         wrangler secret put STRIPE_PRICE_PRO_MONTHLY
-#                         wrangler secret put STRIPE_PRICE_STUDIO_MONTHLY
-#   7. Deploy:            wrangler pages deploy ./dist
+# Quick reference:
+#   wrangler login
+#   wrangler d1 create rezavu-db                  → update database_id below
+#   wrangler kv namespace create rezavu-sessions  → update id below
+#   wrangler d1 execute rezavu-db --remote --file=migrations/0001_rezavu_core.sql
+#   wrangler d1 execute rezavu-db --remote --file=migrations/0002_booking_rules.sql
+#   npm run build
+#   wrangler pages deploy ./dist --project-name=rezavu
+#   wrangler pages secret put <NAME> --project-name=rezavu   (see [secrets] list below)
 
-name = "reservly"
+name = "rezavu"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
 # ─── D1 Database ─────────────────────────────────────────────────────────────
+# NOTE: this database_id predates the rebrand and was never verified against a
+# real Cloudflare account — create rezavu-db and replace it before deploying.
 [[d1_databases]]
 binding = "DB"
-database_name = "reservly-db"
+database_name = "rezavu-db"
 database_id = "7220664c-4098-4dcf-8030-470443007e2f"
 
 # ─── KV Namespace (session cache) ────────────────────────────────────────────
+# NOTE: same caveat — verify or recreate, then update this id.
 [[kv_namespaces]]
 binding = "KV"
 id = "bfaeb12444044848bb6b60a09e112953"
 
 # ─── Environment variables (non-secret) ──────────────────────────────────────
 [vars]
-SITE_URL = "https://reservly.octolabs.app"
+SITE_URL = "https://rezavu.octolabs.app"
 
-# ─── Secrets (set via `wrangler secret put <NAME>`, never in this file) ──────
-# SESSION_SECRET
+# ─── Secrets (set via `wrangler pages secret put <NAME> --project-name=rezavu`)
 # TWILIO_ACCOUNT_SID
 # TWILIO_AUTH_TOKEN
 # TWILIO_WHATSAPP_FROM
@@ -49,8 +43,3 @@ SITE_URL = "https://reservly.octolabs.app"
 # STRIPE_WEBHOOK_SECRET
 # STRIPE_PRICE_PRO_MONTHLY
 # STRIPE_PRICE_STUDIO_MONTHLY
-
-# ─── Local dev with D1 (optional - uses dev-store by default) ────────────────
-# To test with a real local D1 during development:
-#   wrangler d1 execute reservly-db --local --file=migrations/0001_reservly_core.sql
-#   wrangler pages dev --d1 DB=reservly-db --kv KV=reservly-sessions

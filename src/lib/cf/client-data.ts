@@ -1,4 +1,4 @@
-import { saveLastBooking } from "@/lib/reservly/dev-store";
+import { saveLastBooking } from "@/lib/rezavu/dev-store";
 import type {
   Availability,
   AvailabilityInput,
@@ -11,7 +11,7 @@ import type {
   Service,
   ServiceInput,
   Slot,
-} from "@/lib/reservly/types";
+} from "@/lib/rezavu/types";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -108,6 +108,20 @@ export function updateAvailability(input: AvailabilityInput): Promise<Availabili
   return api("/api/dashboard/availability", {
     method: "POST",
     body: jsonBody(input),
+  });
+}
+
+export async function createOwnerBooking(input: BookingInput): Promise<Booking> {
+  return api("/api/dashboard/create-booking", {
+    method: "POST",
+    body: jsonBody(input),
+  });
+}
+
+export function deleteAccount(): Promise<void> {
+  return api("/api/auth/delete-account", {
+    method: "POST",
+    body: jsonBody({ confirm: "DELETE" }),
   });
 }
 

@@ -30,7 +30,7 @@ export function Brand({ size = "md", light = false }: { size?: "sm" | "md"; ligh
     <Link to="/" className="flex items-center gap-2">
       <BrandMark className={size === "sm" ? "h-6 w-6" : "h-7 w-7"} />
       <span className={`font-display ${text} ${light ? "text-white" : "text-foreground"}`}>
-        Reservly
+        Rezavu
       </span>
     </Link>
   );
@@ -65,11 +65,11 @@ export function SiteHeader() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/auth" className="btn-frame hidden sm:inline-flex">
+          <Link to="/auth" className="btn-frame px-3 sm:px-4">
             Sign in
           </Link>
-          <Link to="/onboarding" className="btn-solid">
-            Start free →
+          <Link to="/onboarding" className="btn-solid px-3 sm:px-4">
+            Start free
           </Link>
         </div>
       </div>

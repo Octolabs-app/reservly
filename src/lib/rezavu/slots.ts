@@ -61,6 +61,31 @@ export function mauritiusDateFromIso(iso: string) {
   }).format(new Date(iso));
 }
 
+/** Today's date input (YYYY-MM-DD) in Mauritius local time. */
+export function mauritiusTodayInput(now = new Date()) {
+  return mauritiusDateFromIso(now.toISOString());
+}
+
+/** Add days to a YYYY-MM-DD date input string (timezone-free arithmetic). */
+export function addDaysToDateInput(dateInput: string, days: number) {
+  const [y = 1970, m = 1, d = 1] = dateInput.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + days, 12));
+  return next.toISOString().slice(0, 10);
+}
+
+/**
+ * UTC ISO bounds of the Mauritius calendar month containing `iso`.
+ * Used so slot display and booking-limit enforcement agree on the bucket.
+ */
+export function mauritiusMonthBounds(iso: string): { start: string; end: string } {
+  const monthKey = getBookingMonthKey(iso); // "YYYY-MM" in MU time
+  const [y = 1970, m = 1] = monthKey.split("-").map(Number);
+  const start = isoFromMauritiusLocal(`${monthKey}-01`, "00:00");
+  const nextKey = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+  const end = isoFromMauritiusLocal(`${nextKey}-01`, "00:00");
+  return { start, end };
+}
+
 export function getBookingMonthKey(iso: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Indian/Mauritius",
@@ -119,6 +144,7 @@ export function generateSlots({
   const close = minutesFromTime(day.closesAt);
   const now = Date.now();
   const minNoticeMs = Math.max(0, minNoticeMinutes) * 60_000;
+  const step = stepMinutes > 0 ? stepMinutes : 30; // guard against a zero/negative interval looping forever
 
   function overlapsBooking(startMs: number, endMs: number) {
     return bookings.some((booking) => {
@@ -151,7 +177,7 @@ export function generateSlots({
   const latestStart = close - service.durationMinutes;
   const slots: Slot[] = [];
 
-  for (let minute = open; minute <= latestStart; minute += stepMinutes) {
+  for (let minute = open; minute <= latestStart; minute += step) {
     const time = timeFromMinutes(minute);
     const startAt = isoFromMauritiusLocal(date, time);
     const startMs = new Date(startAt).getTime();

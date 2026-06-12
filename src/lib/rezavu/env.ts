@@ -1,4 +1,4 @@
-// src/lib/reservly/env.ts
+// src/lib/rezavu/env.ts
 // Public client-side environment variables (VITE_ prefix = shipped to browser).
 // Supabase vars removed — auth and data now backed by Cloudflare D1 + Workers.
 

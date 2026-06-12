@@ -1,6 +1,6 @@
 // src/lib/cf/db.ts
 // Cloudflare D1 database client.
-// Replaces: src/lib/reservly/supabase.ts + admin.server.ts
+// Replaces: src/lib/rezavu/supabase.ts + admin.server.ts
 //
 // On Cloudflare Workers, the D1 binding is passed per-request via the
 // execution context. TanStack Start exposes it through the Nitro event's
@@ -54,7 +54,6 @@ export type CloudflareEnv = {
   STRIPE_PRICE_PRO_MONTHLY?: string;
   STRIPE_PRICE_STUDIO_MONTHLY?: string;
   SITE_URL?: string;
-  SESSION_SECRET?: string;
 };
 
 export type KVNamespace = {
@@ -107,22 +106,48 @@ export function isD1Enabled(): boolean {
 }
 
 /**
- * Thin typed query helper. Throws on D1 error so callers don't need to
- * manually check .success.
+ * Thin typed query helpers. Throw on D1 error so callers don't need to
+ * manually check .success. Raw driver errors are logged server-side and
+ * replaced with a generic message so SQL internals never reach clients.
  */
+const GENERIC_DB_ERROR = "Something went wrong. Please try again.";
+
 export async function d1All<T = Record<string, unknown>>(stmt: D1PreparedStatement): Promise<T[]> {
-  const result = await stmt.all<T>();
-  if (!result.success) throw new Error(result.error ?? "D1 query failed");
+  let result: D1Result<T>;
+  try {
+    result = await stmt.all<T>();
+  } catch (error) {
+    console.error("[d1All]", error);
+    throw new Error(GENERIC_DB_ERROR);
+  }
+  if (!result.success) {
+    console.error("[d1All]", result.error);
+    throw new Error(GENERIC_DB_ERROR);
+  }
   return result.results;
 }
 
 export async function d1First<T = Record<string, unknown>>(
   stmt: D1PreparedStatement,
 ): Promise<T | null> {
-  return stmt.first<T>();
+  try {
+    return await stmt.first<T>();
+  } catch (error) {
+    console.error("[d1First]", error);
+    throw new Error(GENERIC_DB_ERROR);
+  }
 }
 
 export async function d1Run(stmt: D1PreparedStatement): Promise<void> {
-  const result = await stmt.run();
-  if (!result.success) throw new Error(result.error ?? "D1 mutation failed");
+  let result: D1Result;
+  try {
+    result = await stmt.run();
+  } catch (error) {
+    console.error("[d1Run]", error);
+    throw new Error(GENERIC_DB_ERROR);
+  }
+  if (!result.success) {
+    console.error("[d1Run]", result.error);
+    throw new Error(GENERIC_DB_ERROR);
+  }
 }

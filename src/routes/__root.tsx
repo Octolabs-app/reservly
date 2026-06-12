@@ -78,13 +78,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "theme-color", content: "#1B4FD8" },
-      { title: "Reservly — Your customers book. WhatsApp confirms." },
+      { title: "Rezavu — Your customers book. WhatsApp confirms." },
       {
         name: "description",
         content:
           "Booking links for island businesses. Customers tap, pick a slot, and get a WhatsApp confirmation — no app, no account.",
       },
-      { property: "og:title", content: "Reservly — Your customers book. WhatsApp confirms." },
+      { property: "og:title", content: "Rezavu — Your customers book. WhatsApp confirms." },
       {
         property: "og:description",
         content: "Booking links for salons, barbers and small businesses. Free to start.",

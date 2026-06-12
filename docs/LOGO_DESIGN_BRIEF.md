@@ -1,4 +1,4 @@
-# Reservly — Logo / App Icon Design Brief
+# Rezavu — Logo / App Icon Design Brief
 
 **Status:** A temporary in-house mark ships with the app today
 (`public/favicon.svg`, `public/logo-mark.svg`, and the inline `<Brand />`
@@ -7,7 +7,7 @@ design without code changes — same files, same names.
 
 ## What we need
 
-A final brand mark + small lockup for Reservly, a booking tool for small
+A final brand mark + small lockup for Rezavu, a booking tool for small
 island businesses (salons, barbers, beauty, wellness, tutors, small
 appointment-based shops) in Mauritius, Réunion and Seychelles.
 
@@ -15,7 +15,7 @@ appointment-based shops) in Mauritius, Réunion and Seychelles.
 
 1. **App icon / square mark** — works at 16px (favicon) up to 512px
    (PWA / social avatar). SVG + PNG exports (16, 32, 180, 192, 512).
-2. **Horizontal lockup** — mark + "Reservly" wordmark for the site header
+2. **Horizontal lockup** — mark + "Rezavu" wordmark for the site header
    and dashboard. SVG.
 3. **Social preview (og:image)** — 1200×630, mark + tagline
    "Your customers book. WhatsApp confirms."
@@ -47,4 +47,4 @@ preview, og:image, future Android/iOS shortcut icon.
 
 - `public/favicon.svg`
 - `public/logo-mark.svg`
-- `src/components/reservly/AppShell.tsx` → `<Brand />` (inline SVG)
+- `src/components/rezavu/AppShell.tsx` → `<Brand />` (inline SVG)

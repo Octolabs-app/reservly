@@ -1,12 +1,12 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Brand } from "@/components/reservly/AppShell";
+import { Brand } from "@/components/rezavu/AppShell";
 import { getCurrentOwner } from "@/lib/cf/auth";
-import type { Owner } from "@/lib/reservly/types";
+import type { Owner } from "@/lib/rezavu/types";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
-    meta: [{ title: "Dashboard — Reservly" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Dashboard — Rezavu" }, { name: "robots", content: "noindex" }],
   }),
   component: DashboardLayout,
 });
@@ -50,7 +50,7 @@ function DashboardLayout() {
                 <Link
                   key={t.id}
                   to={t.to}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs transition-colors ${
+                  className={`flex min-h-10 items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition-colors ${
                     active
                       ? "bg-white/12 font-medium text-white"
                       : "text-white/45 hover:text-white/80"
@@ -66,13 +66,13 @@ function DashboardLayout() {
           <div className="flex items-center gap-2.5">
             <button
               onClick={signOut}
-              className="hidden text-xs text-white/45 transition-colors hover:text-white sm:block"
+              className="min-h-10 rounded-lg px-2 text-xs text-white/45 transition-colors hover:text-white"
             >
               Sign out
             </button>
             <div
               title={owner?.email ?? "Account"}
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white"
+              className="hidden h-8 w-8 items-center justify-center rounded-full bg-primary text-[13px] font-bold text-white sm:flex"
             >
               {initials(owner?.name ?? owner?.email ?? "RO")}
             </div>

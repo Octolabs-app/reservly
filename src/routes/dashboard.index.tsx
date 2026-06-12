@@ -1,10 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, Panel, StatusPill } from "@/components/reservly/AppShell";
-import { getDashboardData } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/reservly/env";
-import { formatDateLabel, formatTimeLabel, getBookingMonthKey } from "@/lib/reservly/slots";
-import type { Booking, DashboardData } from "@/lib/reservly/types";
+import { EmptyState, Panel, StatusPill } from "@/components/rezavu/AppShell";
+import { createOwnerBooking, getDashboardData } from "@/lib/cf/client-data";
+import { getSiteUrl } from "@/lib/rezavu/env";
+import { validateWhatsAppNumber } from "@/lib/rezavu/phone";
+import {
+  formatDateLabel,
+  formatTimeLabel,
+  getBookingMonthKey,
+  isoFromMauritiusLocal,
+  mauritiusDateFromIso,
+  mauritiusTodayInput,
+} from "@/lib/rezavu/slots";
+import type { Booking, DashboardData } from "@/lib/rezavu/types";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardHome,
@@ -19,18 +27,29 @@ function greeting(now: Date) {
 
 function DashboardHome() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+
+  async function refresh() {
+    setLoadError(null);
+    try {
+      setData(await getDashboardData());
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Could not load your dashboard.");
+    }
+  }
 
   useEffect(() => {
-    getDashboardData().then(setData);
+    void refresh();
   }, []);
 
   const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10);
+  const todayKey = mauritiusTodayInput(now);
   const monthKey = getBookingMonthKey(now.toISOString());
   const activeBookings = data?.bookings.filter((booking) => booking.status !== "cancelled") ?? [];
   const today = activeBookings
-    .filter((booking) => booking.startAt.slice(0, 10) === todayKey)
+    .filter((booking) => mauritiusDateFromIso(booking.startAt) === todayKey)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
   const upcoming = activeBookings.filter(
     (booking) => new Date(booking.startAt).getTime() >= now.getTime(),
@@ -78,6 +97,23 @@ function DashboardHome() {
       }
     }
     copy();
+  }
+
+  if (loadError) {
+    return (
+      <Panel>
+        <EmptyState
+          icon="📡"
+          title="Couldn't load your dashboard"
+          sub={loadError}
+          action={
+            <button onClick={() => void refresh()} className="btn-solid">
+              Retry
+            </button>
+          }
+        />
+      </Panel>
+    );
   }
 
   if (!data) return <DashboardSkeleton />;
@@ -180,15 +216,23 @@ function DashboardHome() {
 
       {/* Today timeline */}
       <div>
-        <div className="kicker mb-2.5">
-          Today — {formatDateLabel(now.toISOString(), { year: "numeric" })}
+        <div className="mb-2.5 flex items-center justify-between">
+          <span className="kicker">
+            Today — {formatDateLabel(now.toISOString(), { year: "numeric" })}
+          </span>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="text-xs font-medium text-primary hover:underline"
+          >
+            + Add booking
+          </button>
         </div>
         <Panel className="overflow-hidden">
           {today.length === 0 ? (
             <EmptyState
               icon="📅"
               title="No bookings today"
-              sub="Share your booking link to fill your day."
+              sub="Share your booking link, or add a walk-in with + Add booking."
             />
           ) : (
             today.map((booking, index) => (
@@ -227,6 +271,186 @@ function DashboardHome() {
             ))
           )}
         </Panel>
+      </div>
+
+      {showAdd && (
+        <AddBookingDialog
+          data={data}
+          onClose={() => setShowAdd(false)}
+          onCreated={() => {
+            setShowAdd(false);
+            void refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── Manual booking dialog (walk-ins / phone bookings) ────────────────── */
+function AddBookingDialog({
+  data,
+  onClose,
+  onCreated,
+}: {
+  data: DashboardData;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const business = data.business!;
+  const [serviceId, setServiceId] = useState(data.services[0]?.id ?? "");
+  const [date, setDate] = useState(mauritiusTodayInput());
+  const [time, setTime] = useState("09:00");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const phoneError = phone.trim() ? validateWhatsAppNumber(phone) : null;
+
+  async function submit() {
+    if (!serviceId || !date || !time || name.trim().length < 2 || phoneError) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await createOwnerBooking({
+        businessId: business.id,
+        serviceId,
+        customerName: name,
+        customerPhone: phone.trim(),
+        customerLanguage: business.bookingPageLanguage,
+        startAt: isoFromMauritiusLocal(date, time),
+      });
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not add the booking.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-booking-title"
+        className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div id="add-booking-title" className="text-[15px] font-bold text-foreground">
+          Add a booking
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          For walk-ins and phone bookings. Skips your notice rules; still blocks double-booking.
+        </p>
+
+        <div className="mt-4 space-y-3">
+          <div>
+            <label className="kicker mb-1.5 block" htmlFor="add-service">
+              Service
+            </label>
+            <select
+              id="add-service"
+              value={serviceId}
+              onChange={(event) => setServiceId(event.target.value)}
+              className="input-field"
+            >
+              {data.services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div>
+              <label className="kicker mb-1.5 block" htmlFor="add-date">
+                Date
+              </label>
+              <input
+                id="add-date"
+                type="date"
+                value={date}
+                min={mauritiusTodayInput()}
+                onChange={(event) => setDate(event.target.value)}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="kicker mb-1.5 block" htmlFor="add-time">
+                Time
+              </label>
+              <input
+                id="add-time"
+                type="time"
+                value={time}
+                onChange={(event) => setTime(event.target.value)}
+                className="input-field"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="kicker mb-1.5 block" htmlFor="add-name">
+              Customer name
+            </label>
+            <input
+              id="add-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Marie Dupont"
+              className="input-field"
+            />
+          </div>
+          <div>
+            <label className="kicker mb-1.5 block" htmlFor="add-phone">
+              WhatsApp number (optional)
+            </label>
+            <input
+              id="add-phone"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              inputMode="tel"
+              placeholder="+230 5700 0000"
+              className="input-field"
+            />
+            <p
+              className={`mt-1 text-[11px] ${phoneError ? "text-destructive" : "text-muted-foreground"}`}
+            >
+              {phoneError ?? "With a number, the customer gets a WhatsApp confirmation."}
+            </p>
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-destructive/25 bg-destructive-soft px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button onClick={onClose} className="btn-frame">
+              Cancel
+            </button>
+            <button
+              onClick={() => void submit()}
+              disabled={busy || !serviceId || name.trim().length < 2 || Boolean(phoneError)}
+              className="btn-solid"
+            >
+              {busy ? "Adding…" : "Add booking"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

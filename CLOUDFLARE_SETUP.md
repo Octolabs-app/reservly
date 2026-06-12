@@ -1,6 +1,6 @@
-# Cloudflare Architecture — Reservly
+# Cloudflare Architecture — Rezavu
 
-This document replaces `SUPABASE_SETUP.md` and `DEPLOYMENT.md` for all Cloudflare deployments.
+Architecture reference. The current deploy runbook is **DEPLOYMENT.md** — follow that for commands; this doc explains the design. (SUPABASE_SETUP.md was removed with the Supabase backend.)
 
 ## Architecture Overview
 
@@ -46,35 +46,36 @@ wrangler login
 
 ### 2. Create D1 Database
 ```bash
-wrangler d1 create reservly-db
+wrangler d1 create rezavu-db
 ```
 Copy the `database_id` into `wrangler.toml` → `[[d1_databases]]`.
 
 ### 3. Run the Migration
 ```bash
 # Production
-wrangler d1 execute reservly-db --file=migrations/0001_reservly_core.sql
+wrangler d1 execute rezavu-db --remote --file=migrations/0001_rezavu_core.sql
+wrangler d1 execute rezavu-db --remote --file=migrations/0002_booking_rules.sql
 
 # Local dev with real D1 (optional)
-wrangler d1 execute reservly-db --local --file=migrations/0001_reservly_core.sql
+wrangler d1 execute rezavu-db --local --file=migrations/0001_rezavu_core.sql
+wrangler d1 execute rezavu-db --local --file=migrations/0002_booking_rules.sql
 ```
 
 ### 4. Create KV Namespace (session cache)
 ```bash
-wrangler kv namespace create reservly-sessions
+wrangler kv namespace create rezavu-sessions
 ```
 Copy the `id` into `wrangler.toml` → `[[kv_namespaces]]`.
 
 ### 5. Set Secrets
 ```bash
-wrangler secret put SESSION_SECRET          # generate: openssl rand -hex 32
-wrangler secret put TWILIO_ACCOUNT_SID
-wrangler secret put TWILIO_AUTH_TOKEN
-wrangler secret put TWILIO_WHATSAPP_FROM    # e.g. whatsapp:+14155238886
-wrangler secret put STRIPE_SECRET_KEY
-wrangler secret put STRIPE_WEBHOOK_SECRET
-wrangler secret put STRIPE_PRICE_PRO_MONTHLY
-wrangler secret put STRIPE_PRICE_STUDIO_MONTHLY
+wrangler pages secret put TWILIO_ACCOUNT_SID --project-name=rezavu
+wrangler pages secret put TWILIO_AUTH_TOKEN --project-name=rezavu
+wrangler pages secret put TWILIO_WHATSAPP_FROM --project-name=rezavu    # e.g. whatsapp:+14155238886
+wrangler pages secret put STRIPE_SECRET_KEY --project-name=rezavu
+wrangler pages secret put STRIPE_WEBHOOK_SECRET --project-name=rezavu
+wrangler pages secret put STRIPE_PRICE_PRO_MONTHLY --project-name=rezavu
+wrangler pages secret put STRIPE_PRICE_STUDIO_MONTHLY --project-name=rezavu
 ```
 
 ### 6. Deploy
@@ -97,7 +98,7 @@ The app detects missing D1 bindings and falls back to the **in-browser dev-store
 
 ### Optional: Test with real local D1
 ```bash
-wrangler pages dev --d1 DB=reservly-db --kv KV=reservly-sessions
+wrangler pages dev --d1 DB=rezavu-db --kv KV=rezavu-sessions
 ```
 
 ---
@@ -111,7 +112,8 @@ wrangler pages dev --d1 DB=reservly-db --kv KV=reservly-sessions
 | `src/lib/cf/data.ts` | All data operations (replaces Supabase SDK calls in `data.ts`) |
 | `src/lib/cf/messaging.ts` | WhatsApp send + inbound + D1 event log |
 | `src/lib/cf/billing.ts` | Stripe checkout + webhook + D1 subscription updates |
-| `migrations/0001_reservly_core.sql` | D1 schema (SQLite dialect) |
+| `migrations/0001_rezavu_core.sql` | D1 schema (SQLite dialect) |
+| `migrations/0002_booking_rules.sql` | Booking rules + all-day services |
 | `wrangler.toml` | Cloudflare Pages + Workers config |
 | `src/routes/api.auth.signin.tsx` | POST /api/auth/signin |
 | `src/routes/api.auth.signup.tsx` | POST /api/auth/signup |
@@ -120,16 +122,16 @@ wrangler pages dev --d1 DB=reservly-db --kv KV=reservly-sessions
 
 ## Retained (unchanged) Files
 
-`src/lib/reservly/dev-store.ts`, `slots.ts`, `slug.ts`, `types.ts` — pure logic, no Supabase deps.  
+`src/lib/rezavu/dev-store.ts`, `slots.ts`, `slug.ts`, `types.ts` — pure logic, no Supabase deps.  
 All route UI files — unchanged.
 
 ## Deprecated (kept but no longer used)
 
-`src/lib/reservly/supabase.ts` — can be deleted once Supabase project is confirmed decommissioned.  
-`src/lib/reservly/admin.server.ts` — replaced by `src/lib/cf/db.ts`.  
-`src/lib/reservly/auth.ts` — replaced by `src/lib/cf/auth.ts`.  
-`src/lib/reservly/billing.server.ts` — replaced by `src/lib/cf/billing.ts`.  
-`src/lib/reservly/messaging.server.ts` — replaced by `src/lib/cf/messaging.ts`.  
+`src/lib/rezavu/supabase.ts` — can be deleted once Supabase project is confirmed decommissioned.  
+`src/lib/rezavu/admin.server.ts` — replaced by `src/lib/cf/db.ts`.  
+`src/lib/rezavu/auth.ts` — replaced by `src/lib/cf/auth.ts`.  
+`src/lib/rezavu/billing.server.ts` — replaced by `src/lib/cf/billing.ts`.  
+`src/lib/rezavu/messaging.server.ts` — replaced by `src/lib/cf/messaging.ts`.  
 `supabase/` directory — keep until Supabase project is confirmed closed.
 
 ---
@@ -179,11 +181,11 @@ Sign out
 
 R2 is not needed for the current MVP. When logo uploads are added (Studio tier):
 ```bash
-wrangler r2 bucket create reservly-assets
+wrangler r2 bucket create rezavu-assets
 ```
 Add to `wrangler.toml`:
 ```toml
 [[r2_buckets]]
 binding = "R2"
-bucket_name = "reservly-assets"
+bucket_name = "rezavu-assets"
 ```

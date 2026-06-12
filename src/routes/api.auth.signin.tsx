@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { signInOwner } from "@/lib/cf/auth";
+import { allowRequest, clientIp } from "@/lib/cf/rate-limit";
 
 export const Route = createFileRoute("/api/auth/signin")({
   component: Empty,
@@ -10,6 +11,20 @@ export const Route = createFileRoute("/api/auth/signin")({
         if (!email || !password) {
           return Response.json({ error: "Email and password required." }, { status: 400 });
         }
+
+        // Throttle per IP and per target email to slow credential brute force.
+        const ip = clientIp(request);
+        const [ipOk, emailOk] = await Promise.all([
+          allowRequest("signin-ip", ip, 20, 300),
+          allowRequest("signin-email", email.trim().toLowerCase(), 10, 300),
+        ]);
+        if (!ipOk || !emailOk) {
+          return Response.json(
+            { error: "Too many attempts. Please wait a few minutes and try again." },
+            { status: 429 },
+          );
+        }
+
         try {
           const { owner, sessionCookie } = await signInOwner(email, password);
           return Response.json({ owner }, { headers: { "Set-Cookie": sessionCookie } });

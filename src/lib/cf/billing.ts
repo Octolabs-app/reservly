@@ -1,6 +1,6 @@
 // src/lib/cf/billing.ts
 // Stripe billing backed by Cloudflare D1.
-// Replaces: src/lib/reservly/billing.server.ts (Supabase admin calls)
+// Replaces: src/lib/rezavu/billing.server.ts (Supabase admin calls)
 
 import Stripe from "stripe";
 import { getCFEnv, getD1, d1Run } from "./db";
@@ -31,6 +31,10 @@ export async function createCheckoutSession(input: {
     success_url: `${siteUrl}/dashboard/settings?checkout=success`,
     cancel_url: `${siteUrl}/dashboard/settings?checkout=cancelled`,
     metadata: { business_id: input.businessId, plan: input.plan },
+    // Copy metadata onto the subscription itself: subscription.updated/deleted
+    // events do NOT carry checkout-session metadata, so without this a
+    // cancellation could never be matched back to the business.
+    subscription_data: { metadata: { business_id: input.businessId, plan: input.plan } },
   });
 
   return { url: session.url, loggedOnly: false };
@@ -46,7 +50,13 @@ export async function handleStripeWebhook(
     return { received: true, skipped: true };
   }
 
-  const event = stripe.webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET);
+  // constructEventAsync — the sync variant uses synchronous crypto, which is
+  // unavailable on Cloudflare Workers.
+  const event = await stripe.webhooks.constructEventAsync(
+    payload,
+    signature,
+    env.STRIPE_WEBHOOK_SECRET,
+  );
   const db = getD1();
   if (!db) return { received: true, skipped: true };
 
@@ -69,7 +79,8 @@ export async function handleStripeWebhook(
     if (businessId) {
       const active =
         event.type === "checkout.session.completed" ||
-        ("status" in object &&
+        (event.type !== "customer.subscription.deleted" &&
+          "status" in object &&
           typeof object.status === "string" &&
           ["active", "trialing"].includes(object.status));
 

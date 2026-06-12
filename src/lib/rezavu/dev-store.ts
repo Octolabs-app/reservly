@@ -2,7 +2,9 @@ import { generateUniqueSlug } from "./slug";
 import {
   calculateMonthlyUsage,
   dateInputFromDate,
+  getMauritiusDayOfWeek,
   isoFromMauritiusLocal,
+  mauritiusDateFromIso,
   timeFromMinutes,
 } from "./slots";
 import {
@@ -30,12 +32,12 @@ type DevState = {
   bookings: Booking[];
 };
 
-const STATE_KEY = "reservly_dev_state_v4";
-const LAST_BOOKING_KEY = "reservly_last_booking";
+const STATE_KEY = "rezavu_dev_state_v4";
+const LAST_BOOKING_KEY = "rezavu_last_booking";
 
 const owner: Owner = {
   id: "dev-owner",
-  email: "owner@reservly.local",
+  email: "owner@rezavu.local",
   name: "Marie Rose",
 };
 
@@ -201,6 +203,21 @@ export async function getDevPublicBusinessBySlug(slug: string): Promise<PublicBu
   return { business, services, availability, usage };
 }
 
+export async function getDevPublicBusinessById(
+  businessId: string,
+): Promise<(PublicBusiness & { bookings: Booking[] }) | null> {
+  const state = loadState();
+  const business = state.businesses.find((entry) => entry.id === businessId);
+  if (!business) return null;
+  const services = state.services.filter(
+    (service) => service.businessId === business.id && service.active,
+  );
+  const availability = state.availability.filter((entry) => entry.businessId === business.id);
+  const bookings = state.bookings.filter((booking) => booking.businessId === business.id);
+  const usage = calculateMonthlyUsage(bookings, business.plan, business.bookingLimitMonthly);
+  return { business, services, availability, usage, bookings };
+}
+
 export async function devSlugExists(slug: string) {
   return loadState().businesses.some((business) => business.slug === slug);
 }
@@ -339,13 +356,14 @@ export async function createDevBooking(input: BookingInput) {
     const startMs = new Date(input.startAt).getTime();
     let endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
     if (service.allDay) {
+      const bookingDate = mauritiusDateFromIso(input.startAt);
       const day = state.availability.find(
         (entry) =>
-          entry.businessId === business.id && entry.dayOfWeek === new Date(startMs).getUTCDay(),
+          entry.businessId === business.id &&
+          entry.dayOfWeek === getMauritiusDayOfWeek(bookingDate),
       );
       if (day) {
-        const dateInput = input.startAt.slice(0, 10);
-        endAt = isoFromMauritiusLocal(dateInput, day.closesAt);
+        endAt = isoFromMauritiusLocal(bookingDate, day.closesAt);
       }
     }
     const taken = state.bookings.some((booking) => {

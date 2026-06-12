@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Panel } from "@/components/reservly/AppShell";
+import { useEffect, useRef, useState } from "react";
+import { EmptyState, Panel } from "@/components/rezavu/AppShell";
 import {
   createService,
+  deleteAccount,
   deleteService,
   getDashboardData,
   updateAvailability,
   updateBusiness,
   updateService,
 } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/reservly/env";
+import { getSiteUrl } from "@/lib/rezavu/env";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
 import type {
   Availability,
   BookingLanguage,
@@ -17,7 +19,7 @@ import type {
   DashboardData,
   Plan,
   Service,
-} from "@/lib/reservly/types";
+} from "@/lib/rezavu/types";
 
 export const Route = createFileRoute("/dashboard/settings")({
   component: SettingsTab,
@@ -52,36 +54,66 @@ const INTERVAL_OPTIONS = [
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
 
+type Tone = "success" | "info" | "error";
+
 function SettingsTab() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [business, setBusiness] = useState<Business | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [saving, setSaving] = useState(false);
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [messageTone, setMessageTone] = useState<"success" | "info">("success");
+  const [messageTone, setMessageTone] = useState<Tone>("success");
+  const [removeTarget, setRemoveTarget] = useState<Service | null>(null);
+  const [showDelete, setShowDelete] = useState(false);
 
   async function refresh() {
-    const next = await getDashboardData();
-    setData(next);
-    setBusiness(next.business);
-    setServices(next.services);
-    setAvailability(next.availability);
+    setLoadError(null);
+    try {
+      const next = await getDashboardData();
+      setData(next);
+      setBusiness(next.business);
+      setServices(next.services);
+      setAvailability(next.availability);
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Could not load settings.");
+    }
   }
 
   useEffect(() => {
     void refresh();
+    // Surface the Stripe checkout result after the redirect back.
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "success") {
+      notify("✓ Payment received — your plan upgrades as soon as Stripe confirms it.", "success");
+      window.history.replaceState({}, "", "/dashboard/settings");
+    } else if (params.get("checkout") === "cancelled") {
+      notify("Checkout cancelled — no changes made.", "info");
+      window.history.replaceState({}, "", "/dashboard/settings");
+    }
   }, []);
 
-  function notify(text: string, tone: "success" | "info" = "success") {
+  function notify(text: string, tone: Tone = "success") {
     setMessageTone(tone);
     setMessage(text);
-    setTimeout(() => setMessage(null), 4000);
+    setTimeout(() => setMessage(null), 5000);
+  }
+
+  function failMessage(err: unknown, fallback: string) {
+    notify(err instanceof Error ? err.message : fallback, "error");
   }
 
   async function saveProfile() {
     if (!business) return;
+    const phoneIssue = business.whatsappNumber
+      ? validateWhatsAppNumber(business.whatsappNumber)
+      : null;
+    if (phoneIssue) {
+      notify(phoneIssue, "error");
+      return;
+    }
     setSaving(true);
     try {
       await updateBusiness({
@@ -89,11 +121,13 @@ function SettingsTab() {
         name: business.name,
         category: business.category,
         city: business.city,
-        whatsappNumber: business.whatsappNumber,
+        whatsappNumber: normalizeWhatsAppNumber(business.whatsappNumber),
         bookingPageLanguage: business.bookingPageLanguage,
       });
       notify("✓ Profile saved");
       await refresh();
+    } catch (err) {
+      failMessage(err, "Profile could not be saved — try again.");
     } finally {
       setSaving(false);
     }
@@ -111,6 +145,8 @@ function SettingsTab() {
       });
       notify("✓ Booking rules saved");
       await refresh();
+    } catch (err) {
+      failMessage(err, "Booking rules could not be saved — try again.");
     } finally {
       setSaving(false);
     }
@@ -143,6 +179,8 @@ function SettingsTab() {
       );
       notify("✓ Services saved");
       await refresh();
+    } catch (err) {
+      failMessage(err, "Services could not be saved — try again.");
     } finally {
       setSaving(false);
     }
@@ -163,18 +201,28 @@ function SettingsTab() {
       });
       notify("✓ Opening hours saved");
       await refresh();
+    } catch (err) {
+      failMessage(err, "Opening hours could not be saved — try again.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function removeService(service: Service) {
-    if (service.id.startsWith("new_")) {
-      setServices(services.filter((entry) => entry.id !== service.id));
+  async function confirmRemoveService() {
+    if (!removeTarget) return;
+    if (removeTarget.id.startsWith("new_")) {
+      setServices(services.filter((entry) => entry.id !== removeTarget.id));
+      setRemoveTarget(null);
       return;
     }
-    await deleteService(service.id);
-    await refresh();
+    try {
+      await deleteService(removeTarget.id);
+      setRemoveTarget(null);
+      notify("✓ Service removed");
+      await refresh();
+    } catch (err) {
+      failMessage(err, "The service could not be removed — try again.");
+    }
   }
 
   async function startCheckout(plan: Extract<Plan, "pro" | "studio">) {
@@ -196,10 +244,42 @@ function SettingsTab() {
       }
       notify("Online upgrades are almost ready. Contact Octolabs to enable Pro or Studio.", "info");
     } catch (error) {
-      notify(error instanceof Error ? error.message : "Checkout could not start.", "info");
+      failMessage(error, "Checkout could not start.");
     } finally {
       setCheckoutPlan(null);
     }
+  }
+
+  async function signOut() {
+    await fetch("/api/auth/signout", { method: "POST", credentials: "include" });
+    window.location.href = "/";
+  }
+
+  async function confirmDeleteAccount() {
+    try {
+      await deleteAccount();
+      window.location.href = "/";
+    } catch (err) {
+      setShowDelete(false);
+      failMessage(err, "Account deletion failed — contact support.");
+    }
+  }
+
+  if (loadError) {
+    return (
+      <Panel>
+        <EmptyState
+          icon="📡"
+          title="Couldn't load settings"
+          sub={loadError}
+          action={
+            <button onClick={() => void refresh()} className="btn-solid">
+              Retry
+            </button>
+          }
+        />
+      </Panel>
+    );
   }
 
   if (!data || !business) return <SettingsSkeleton />;
@@ -211,6 +291,9 @@ function SettingsTab() {
   const usagePercent = data.usage.limit
     ? Math.min(100, (data.usage.used / data.usage.limit) * 100)
     : 100;
+  const ownerPhoneIssue = business.whatsappNumber
+    ? validateWhatsAppNumber(business.whatsappNumber)
+    : null;
 
   return (
     <div className="space-y-5">
@@ -223,10 +306,13 @@ function SettingsTab() {
 
       {message && (
         <div
+          role="status"
           className={`rounded-[10px] border px-3.5 py-2.5 text-sm ${
             messageTone === "success"
               ? "border-success/30 bg-success-soft text-success"
-              : "border-primary-mid bg-primary-soft text-primary"
+              : messageTone === "error"
+                ? "border-destructive/25 bg-destructive-soft text-destructive"
+                : "border-primary-mid bg-primary-soft text-primary"
           }`}
         >
           {message}
@@ -292,25 +378,40 @@ function SettingsTab() {
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
+            id="biz-name"
             label="Business name"
             value={business.name}
             onChange={(value) => setBusiness({ ...business, name: value })}
           />
           <Field
+            id="biz-city"
             label="City"
             value={business.city}
             onChange={(value) => setBusiness({ ...business, city: value })}
           />
           <Field
+            id="biz-category"
             label="Category"
             value={business.category}
             onChange={(value) => setBusiness({ ...business, category: value })}
           />
-          <Field
-            label="WhatsApp number"
-            value={business.whatsappNumber}
-            onChange={(value) => setBusiness({ ...business, whatsappNumber: value })}
-          />
+          <div>
+            <label className="kicker mb-1.5 block" htmlFor="biz-whatsapp">
+              WhatsApp number
+            </label>
+            <input
+              id="biz-whatsapp"
+              value={business.whatsappNumber}
+              onChange={(value) => setBusiness({ ...business, whatsappNumber: value.target.value })}
+              inputMode="tel"
+              className="input-field"
+            />
+            <p
+              className={`mt-1 text-[11px] ${ownerPhoneIssue ? "text-destructive" : "text-muted-foreground"}`}
+            >
+              {ownerPhoneIssue ?? "Booking alerts arrive on this number."}
+            </p>
+          </div>
           <div>
             <div className="kicker mb-2">Booking page language</div>
             <div className="grid grid-cols-3 gap-2">
@@ -318,7 +419,8 @@ function SettingsTab() {
                 <button
                   key={lang}
                   onClick={() => setBusiness({ ...business, bookingPageLanguage: lang })}
-                  className={`rounded-[10px] border-[1.5px] px-2 py-2 text-xs transition-all ${
+                  aria-pressed={business.bookingPageLanguage === lang}
+                  className={`min-h-10 rounded-[10px] border-[1.5px] px-2 py-2 text-xs transition-all ${
                     business.bookingPageLanguage === lang
                       ? "border-primary bg-primary-soft font-semibold text-primary"
                       : "border-border bg-white text-muted-foreground hover:border-primary-mid"
@@ -364,8 +466,11 @@ function SettingsTab() {
         />
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="kicker mb-1.5 block">Minimum notice before booking</label>
+            <label className="kicker mb-1.5 block" htmlFor="rule-notice">
+              Minimum notice before booking
+            </label>
             <select
+              id="rule-notice"
               value={business.minNoticeMinutes}
               onChange={(event) =>
                 setBusiness({ ...business, minNoticeMinutes: Number(event.target.value) })
@@ -383,8 +488,11 @@ function SettingsTab() {
             </p>
           </div>
           <div>
-            <label className="kicker mb-1.5 block">How far ahead customers can book</label>
+            <label className="kicker mb-1.5 block" htmlFor="rule-advance">
+              How far ahead customers can book
+            </label>
             <select
+              id="rule-advance"
               value={business.maxAdvanceDays}
               onChange={(event) =>
                 setBusiness({ ...business, maxAdvanceDays: Number(event.target.value) })
@@ -402,8 +510,11 @@ function SettingsTab() {
             </p>
           </div>
           <div>
-            <label className="kicker mb-1.5 block">Booking slot interval</label>
+            <label className="kicker mb-1.5 block" htmlFor="rule-interval">
+              Booking slot interval
+            </label>
             <select
+              id="rule-interval"
               value={
                 business.slotIntervalMinutes == null ? "" : String(business.slotIntervalMinutes)
               }
@@ -475,8 +586,11 @@ function SettingsTab() {
             <div key={service.id} className="rounded-xl border border-border p-3.5">
               <div className="grid gap-3 sm:grid-cols-[1fr_150px_110px_auto] sm:items-end">
                 <div>
-                  <label className="kicker mb-1.5 block">Service name</label>
+                  <label className="kicker mb-1.5 block" htmlFor={`svc-name-${index}`}>
+                    Service name
+                  </label>
                   <input
+                    id={`svc-name-${index}`}
                     value={service.name}
                     onChange={(event) =>
                       replaceService(
@@ -491,8 +605,11 @@ function SettingsTab() {
                   />
                 </div>
                 <div>
-                  <label className="kicker mb-1.5 block">Duration</label>
+                  <label className="kicker mb-1.5 block" htmlFor={`svc-duration-${index}`}>
+                    Duration
+                  </label>
                   <select
+                    id={`svc-duration-${index}`}
                     value={service.allDay ? "all-day" : String(service.durationMinutes)}
                     onChange={(event) => {
                       const value = event.target.value;
@@ -530,8 +647,11 @@ function SettingsTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="kicker mb-1.5 block">Price</label>
+                  <label className="kicker mb-1.5 block" htmlFor={`svc-price-${index}`}>
+                    Price
+                  </label>
                   <input
+                    id={`svc-price-${index}`}
                     value={service.priceLabel}
                     onChange={(event) =>
                       replaceService(
@@ -546,8 +666,8 @@ function SettingsTab() {
                   />
                 </div>
                 <button
-                  onClick={() => void removeService(service)}
-                  className="justify-self-start rounded-lg px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive sm:justify-self-auto"
+                  onClick={() => setRemoveTarget(service)}
+                  className="min-h-10 justify-self-start rounded-lg px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive sm:justify-self-auto"
                 >
                   Remove
                 </button>
@@ -601,7 +721,9 @@ function SettingsTab() {
                       setAvailability,
                     )
                   }
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  aria-pressed={entry.isOpen}
+                  aria-label={`${DAY_LABELS[entry.dayOfWeek]} — ${entry.isOpen ? "open" : "closed"}`}
+                  className={`min-h-9 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
                     entry.isOpen
                       ? "bg-success-soft text-success"
                       : "bg-surface-2 text-muted-foreground"
@@ -613,6 +735,7 @@ function SettingsTab() {
                   <div className="ml-auto flex items-center gap-1.5">
                     <input
                       value={entry.opensAt}
+                      aria-label={`${DAY_LABELS[entry.dayOfWeek]} opening time`}
                       onChange={(event) =>
                         patchAvailability(
                           entry.dayOfWeek,
@@ -622,11 +745,12 @@ function SettingsTab() {
                         )
                       }
                       type="time"
-                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                      className="rounded-lg border border-border bg-white px-2 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
                     />
                     <span className="text-xs text-muted-foreground">–</span>
                     <input
                       value={entry.closesAt}
+                      aria-label={`${DAY_LABELS[entry.dayOfWeek]} closing time`}
                       onChange={(event) =>
                         patchAvailability(
                           entry.dayOfWeek,
@@ -636,7 +760,7 @@ function SettingsTab() {
                         )
                       }
                       type="time"
-                      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                      className="rounded-lg border border-border bg-white px-2 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
                     />
                   </div>
                 )}
@@ -644,6 +768,98 @@ function SettingsTab() {
             ))}
         </div>
       </Panel>
+
+      {/* Account */}
+      <Panel className="p-5">
+        <SectionHeader title="Account" sub="Session and account controls." />
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => void signOut()} className="btn-frame">
+            Sign out
+          </button>
+          <button
+            onClick={() => setShowDelete(true)}
+            className="rounded-[10px] border border-destructive/30 bg-destructive-soft px-4 py-2.5 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive hover:text-white"
+          >
+            Delete account
+          </button>
+        </div>
+      </Panel>
+
+      {removeTarget && (
+        <ConfirmDialog
+          title={`Remove "${removeTarget.name || "this service"}"?`}
+          body="Customers will no longer be able to book it. Existing bookings keep their details."
+          confirmLabel="Remove service"
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={() => void confirmRemoveService()}
+        />
+      )}
+
+      {showDelete && (
+        <ConfirmDialog
+          title="Delete your account?"
+          body="This permanently deletes your business, services, bookings and message history. This cannot be undone."
+          confirmLabel="Delete everything"
+          onCancel={() => setShowDelete(false)}
+          onConfirm={() => void confirmDeleteAccount()}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onCancel();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onCancel}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-dialog-title"
+        className="w-full max-w-xs rounded-2xl bg-white p-5 shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div id="confirm-dialog-title" className="text-[15px] font-bold text-foreground">
+          {title}
+        </div>
+        <p className="mt-1.5 text-[13px] text-muted-foreground">{body}</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button ref={cancelRef} onClick={onCancel} className="btn-frame">
+            Keep it
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-[10px] border border-destructive/30 bg-destructive-soft px-3 py-2 text-[13px] font-medium text-destructive transition-colors hover:bg-destructive hover:text-white"
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -690,18 +906,23 @@ function SettingsSkeleton() {
 }
 
 function Field({
+  id,
   label,
   value,
   onChange,
 }: {
+  id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
 }) {
   return (
     <div>
-      <label className="kicker mb-1.5 block">{label}</label>
+      <label className="kicker mb-1.5 block" htmlFor={id}>
+        {label}
+      </label>
       <input
+        id={id}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         className="input-field"

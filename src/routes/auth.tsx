@@ -1,16 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
-    meta: [{ title: "Sign in - Reservly" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Sign in — Rezavu" }, { name: "robots", content: "noindex" }],
   }),
   component: AuthPage,
 });
 
 function AuthPage() {
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ function AuthPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(mode === "sign-up" ? { email, password, name } : { email, password }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Authentication failed.");
@@ -65,6 +66,22 @@ function AuthPage() {
               void submit();
             }}
           >
+            {mode === "sign-up" && (
+              <div>
+                <label className="kicker mb-1.5 block" htmlFor="auth-name">
+                  Your name
+                </label>
+                <input
+                  id="auth-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  type="text"
+                  autoComplete="name"
+                  placeholder="Marie Rose"
+                  className="input-field"
+                />
+              </div>
+            )}
             <div>
               <label className="kicker mb-1.5 block" htmlFor="auth-email">
                 Email
@@ -89,7 +106,7 @@ function AuthPage() {
                 onChange={(event) => setPassword(event.target.value)}
                 type="password"
                 autoComplete={mode === "sign-in" ? "current-password" : "new-password"}
-                placeholder={mode === "sign-up" ? "At least 6 characters" : "Your password"}
+                placeholder={mode === "sign-up" ? "At least 8 characters" : "Your password"}
                 className="input-field"
               />
             </div>
@@ -102,7 +119,7 @@ function AuthPage() {
 
             <button
               type="submit"
-              disabled={busy || !email || password.length < 6}
+              disabled={busy || !email || password.length < (mode === "sign-up" ? 8 : 1)}
               className="btn-solid w-full py-3"
             >
               {busy ? "Working…" : mode === "sign-in" ? "Sign in" : "Create account"}
@@ -114,7 +131,7 @@ function AuthPage() {
                 setMode(mode === "sign-in" ? "sign-up" : "sign-in");
                 setError(null);
               }}
-              className="block w-full text-center text-[13px] font-medium text-primary hover:underline"
+              className="block w-full py-1 text-center text-[13px] font-medium text-primary hover:underline"
             >
               {mode === "sign-in" ? "New here? Create an account" : "I already have an account"}
             </button>

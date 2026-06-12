@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireApiOwner, jsonError } from "@/lib/cf/api";
 import { createService, deleteService, updateService } from "@/lib/cf/data";
-import type { ServiceInput } from "@/lib/reservly/types";
+import type { ServiceInput } from "@/lib/rezavu/types";
 
 type ServiceRequest =
   | { action: "create"; input: ServiceInput }

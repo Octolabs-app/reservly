@@ -1,19 +1,20 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
 import { getCurrentOwner } from "@/lib/cf/auth";
 import { createBusiness, createService, updateAvailability } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/reservly/env";
-import type { BookingLanguage } from "@/lib/reservly/types";
+import { getSiteUrl } from "@/lib/rezavu/env";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
+import type { BookingLanguage } from "@/lib/rezavu/types";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Set up your business - Reservly" },
+      { title: "Set up your business — Rezavu" },
       {
         name: "description",
         content:
-          "Three steps to get your Reservly booking link live: business info, services, opening hours.",
+          "Three steps to get your Rezavu booking link live: business info, services, opening hours.",
       },
     ],
   }),
@@ -108,7 +109,11 @@ function OnboardingPage() {
 
   const stepNames = ["Your business", "Your services", "Opening hours"];
   const validServices = services.filter((service) => service.name.trim());
-  const canNext1 = biz.name.trim() && biz.category;
+  const ownerPhoneIssue =
+    biz.whatsappNumber.trim() && biz.whatsappNumber.trim() !== "+230"
+      ? validateWhatsAppNumber(biz.whatsappNumber)
+      : null;
+  const canNext1 = biz.name.trim() && biz.category && !ownerPhoneIssue;
   const canNext2 = validServices.length > 0;
   const siteHost = getSiteUrl().replace(/^https?:\/\//, "");
 
@@ -126,7 +131,8 @@ function OnboardingPage() {
         name: biz.name,
         category: biz.category,
         city: biz.city,
-        whatsappNumber: biz.whatsappNumber,
+        whatsappNumber:
+          biz.whatsappNumber.trim() === "+230" ? "" : normalizeWhatsAppNumber(biz.whatsappNumber),
         bookingPageLanguage: biz.lang,
       });
 
@@ -185,8 +191,8 @@ function OnboardingPage() {
             </div>
             <div className="p-6">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Create a free account (or sign in) so Reservly can save your business, services,
-                hours and booking link.
+                Create a free account (or sign in) so Rezavu can save your business, services, hours
+                and booking link.
               </p>
               <a href="/auth?redirectTo=/onboarding" className="btn-solid mt-5 w-full py-3">
                 Sign in or create account →
@@ -236,8 +242,11 @@ function OnboardingPage() {
                 </header>
 
                 <div>
-                  <label className="kicker mb-1.5 block">Business name *</label>
+                  <label className="kicker mb-1.5 block" htmlFor="ob-name">
+                    Business name *
+                  </label>
                   <input
+                    id="ob-name"
                     value={biz.name}
                     onChange={(event) => setBiz({ ...biz, name: event.target.value })}
                     placeholder="e.g. Salon Rose"
@@ -269,8 +278,11 @@ function OnboardingPage() {
                 </div>
 
                 <div>
-                  <label className="kicker mb-1.5 block">City</label>
+                  <label className="kicker mb-1.5 block" htmlFor="ob-city">
+                    City
+                  </label>
                   <input
+                    id="ob-city"
                     value={biz.city}
                     onChange={(event) => setBiz({ ...biz, city: event.target.value })}
                     placeholder="Port Louis, Quatre Bornes, Curepipe…"
@@ -279,15 +291,29 @@ function OnboardingPage() {
                 </div>
 
                 <div>
-                  <label className="kicker mb-1.5 block">Your WhatsApp number</label>
+                  <label className="kicker mb-1.5 block" htmlFor="ob-whatsapp">
+                    Your WhatsApp number
+                  </label>
                   <input
+                    id="ob-whatsapp"
                     value={biz.whatsappNumber}
                     onChange={(event) => setBiz({ ...biz, whatsappNumber: event.target.value })}
+                    onBlur={() => {
+                      const normalized = normalizeWhatsAppNumber(biz.whatsappNumber);
+                      if (!validateWhatsAppNumber(normalized)) {
+                        setBiz({ ...biz, whatsappNumber: normalized });
+                      }
+                    }}
+                    inputMode="tel"
                     placeholder="+230 5700 0000"
                     className="input-field"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    You'll get a WhatsApp alert for every new booking.
+                  <p
+                    className={`mt-1 text-[11px] ${
+                      ownerPhoneIssue ? "text-destructive" : "text-muted-foreground"
+                    }`}
+                  >
+                    {ownerPhoneIssue ?? "You'll get a WhatsApp alert for every new booking."}
                   </p>
                 </div>
 
@@ -336,6 +362,7 @@ function OnboardingPage() {
                     </div>
                     <input
                       value={service.name}
+                      aria-label={`Service ${index + 1} name`}
                       onChange={(event) =>
                         patchService(index, { name: event.target.value }, services, setServices)
                       }
@@ -403,6 +430,7 @@ function OnboardingPage() {
                             type="number"
                             min={5}
                             step={5}
+                            aria-label={`Service ${index + 1} duration in minutes`}
                             value={service.durationMinutes}
                             onChange={(event) =>
                               patchService(
@@ -425,8 +453,11 @@ function OnboardingPage() {
                       )}
                     </div>
                     <div className="mt-3">
-                      <label className="kicker mb-1.5 block">Price (optional)</label>
+                      <label className="kicker mb-1.5 block" htmlFor={`ob-price-${index}`}>
+                        Price (optional)
+                      </label>
                       <input
+                        id={`ob-price-${index}`}
                         value={service.priceLabel}
                         onChange={(event) =>
                           patchService(
@@ -473,6 +504,7 @@ function OnboardingPage() {
                     >
                       <Toggle
                         on={hour.isOpen}
+                        label={`${hour.label} — ${hour.isOpen ? "open" : "closed"}`}
                         onChange={() => {
                           const next = [...hours];
                           next[index] = { ...next[index], isOpen: !next[index].isOpen };
@@ -491,6 +523,7 @@ function OnboardingPage() {
                           <TimeSelect
                             value={hour.opensAt}
                             options={TIME_OPTIONS}
+                            label={`${hour.label} opening time`}
                             onChange={(value) => {
                               const next = [...hours];
                               next[index] = { ...next[index], opensAt: value };
@@ -501,6 +534,7 @@ function OnboardingPage() {
                           <TimeSelect
                             value={hour.closesAt}
                             options={TIME_OPTIONS}
+                            label={`${hour.label} closing time`}
                             onChange={(value) => {
                               const next = [...hours];
                               next[index] = { ...next[index], closesAt: value };
@@ -618,20 +652,21 @@ function Chip({
   );
 }
 
-function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
+function Toggle({ on, label, onChange }: { on: boolean; label: string; onChange: () => void }) {
   return (
     <button
       type="button"
       onClick={onChange}
       role="switch"
       aria-checked={on}
-      className={`relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors ${
+      aria-label={label}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
         on ? "bg-primary" : "bg-border-strong"
       }`}
     >
       <span
-        className={`absolute top-0.5 h-[18px] w-[18px] rounded-full bg-white shadow-sm transition-all ${
-          on ? "left-[18px]" : "left-0.5"
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${
+          on ? "left-[22px]" : "left-0.5"
         }`}
       />
     </button>
@@ -641,17 +676,20 @@ function Toggle({ on, onChange }: { on: boolean; onChange: () => void }) {
 function TimeSelect({
   value,
   options,
+  label,
   onChange,
 }: {
   value: string;
   options: string[];
+  label: string;
   onChange: (value: string) => void;
 }) {
   return (
     <select
       value={value}
+      aria-label={label}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-lg border border-border bg-white px-2 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+      className="rounded-lg border border-border bg-white px-2 py-2 text-xs text-foreground focus:border-primary focus:outline-none"
     >
       {options.map((option) => (
         <option key={option} value={option}>
