@@ -18,18 +18,17 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
 # ─── D1 Database ─────────────────────────────────────────────────────────────
-# NOTE: this database_id predates the rebrand and was never verified against a
-# real Cloudflare account — create rezavu-db and replace it before deploying.
+# Created 2026-06-12 via Cloudflare API; migrations 0001 + 0002 applied.
 [[d1_databases]]
 binding = "DB"
 database_name = "rezavu-db"
-database_id = "7220664c-4098-4dcf-8030-470443007e2f"
+database_id = "2d8a263f-5172-4f50-ad5b-2be16164634a"
 
 # ─── KV Namespace (session cache) ────────────────────────────────────────────
-# NOTE: same caveat — verify or recreate, then update this id.
+# Created 2026-06-12 via Cloudflare API.
 [[kv_namespaces]]
 binding = "KV"
-id = "bfaeb12444044848bb6b60a09e112953"
+id = "87ba9053bea9483a82ec921123839504"
 
 # ─── Environment variables (non-secret) ──────────────────────────────────────
 [vars]
