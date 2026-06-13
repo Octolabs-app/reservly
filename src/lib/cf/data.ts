@@ -32,8 +32,8 @@ import {
   updateDevAvailability,
   updateDevBusiness,
   updateDevService,
-} from "@/lib/rezavu/dev-store";
-import { generateUniqueSlug } from "@/lib/rezavu/slug";
+} from "@/lib/randevou/dev-store";
+import { generateUniqueSlug } from "@/lib/randevou/slug";
 import {
   calculateMonthlyUsage,
   formatDateLabel,
@@ -43,8 +43,8 @@ import {
   isoFromMauritiusLocal,
   mauritiusDateFromIso,
   mauritiusMonthBounds,
-} from "@/lib/rezavu/slots";
-import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
+} from "@/lib/randevou/slots";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
 import {
   DEFAULT_MAX_ADVANCE_DAYS,
   DEFAULT_MIN_NOTICE_MINUTES,
@@ -64,7 +64,7 @@ import {
   type Service,
   type ServiceInput,
   type Slot,
-} from "@/lib/rezavu/types";
+} from "@/lib/randevou/types";
 
 // ─── Row types (D1 column names) ─────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ function clampBookingRules(input: Partial<BusinessInput>) {
 }
 
 function siteUrlFromEnv() {
-  return (getCFEnv()?.SITE_URL ?? "https://rezavu.octolabs.app").replace(/\/$/, "");
+  return (getCFEnv()?.SITE_URL ?? "https://randevou.octolabs.app").replace(/\/$/, "");
 }
 type ServiceRow = {
   id: string;

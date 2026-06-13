@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EmptyState, Panel, StatusPill } from "@/components/rezavu/AppShell";
+import { EmptyState, Panel, StatusPill } from "@/components/randevou/AppShell";
 import { cancelBooking, getDashboardData, markBookingConfirmed } from "@/lib/cf/client-data";
-import { formatDateLabel, formatTimeLabel } from "@/lib/rezavu/slots";
-import type { Booking, BookingStatus, DashboardData } from "@/lib/rezavu/types";
+import { formatDateLabel, formatTimeLabel } from "@/lib/randevou/slots";
+import type { Booking, BookingStatus, DashboardData } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/dashboard/bookings")({
   component: BookingsTab,

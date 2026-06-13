@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { EmptyState, Panel, StatusPill } from "@/components/rezavu/AppShell";
+import { EmptyState, Panel, StatusPill } from "@/components/randevou/AppShell";
 import { createOwnerBooking, getDashboardData } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/rezavu/env";
-import { validateWhatsAppNumber } from "@/lib/rezavu/phone";
+import { getSiteUrl } from "@/lib/randevou/env";
+import { validateWhatsAppNumber } from "@/lib/randevou/phone";
 import {
   formatDateLabel,
   formatTimeLabel,
@@ -11,8 +11,8 @@ import {
   isoFromMauritiusLocal,
   mauritiusDateFromIso,
   mauritiusTodayInput,
-} from "@/lib/rezavu/slots";
-import type { Booking, DashboardData } from "@/lib/rezavu/types";
+} from "@/lib/randevou/slots";
+import type { Booking, DashboardData } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardHome,

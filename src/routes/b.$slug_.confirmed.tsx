@@ -1,15 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 import { getBookingById } from "@/lib/cf/client-data";
-import { getLastBooking } from "@/lib/rezavu/dev-store";
-import { t, type PageLang } from "@/lib/rezavu/i18n";
-import { formatDateLabel, formatTimeLabel } from "@/lib/rezavu/slots";
-import type { Booking } from "@/lib/rezavu/types";
+import { getLastBooking } from "@/lib/randevou/dev-store";
+import { t, type PageLang } from "@/lib/randevou/i18n";
+import { formatDateLabel, formatTimeLabel } from "@/lib/randevou/slots";
+import type { Booking } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/b/$slug_/confirmed")({
   head: () => ({
-    meta: [{ title: "Booking confirmed — Rezavu" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Booking confirmed — Randevou" }, { name: "robots", content: "noindex" }],
   }),
   component: ConfirmedPage,
 });
@@ -150,7 +150,7 @@ function ConfirmedPage() {
                 to="/"
                 className="text-xs font-medium text-muted-foreground hover:text-foreground"
               >
-                Powered by Rezavu →
+                Powered by Randevou →
               </Link>
             </div>
           </div>

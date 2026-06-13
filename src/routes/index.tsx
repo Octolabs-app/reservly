@@ -1,17 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BrandMark, SiteHeader } from "@/components/rezavu/AppShell";
-import { getSiteUrl } from "@/lib/rezavu/env";
+import { BrandMark, SiteHeader } from "@/components/randevou/AppShell";
+import { getSiteUrl } from "@/lib/randevou/env";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Rezavu — Your customers book. WhatsApp confirms." },
+      { title: "Randevou — Your customers book. WhatsApp confirms." },
       {
         name: "description",
         content:
-          "Rezavu gives every island business a booking link that works with the tools your customers already use. No app. No friction. No no-shows.",
+          "Randevou gives every island business a booking link that works with the tools your customers already use. No app. No friction. No no-shows.",
       },
-      { property: "og:title", content: "Rezavu — Your customers book. WhatsApp confirms." },
+      { property: "og:title", content: "Randevou — Your customers book. WhatsApp confirms." },
       {
         property: "og:description",
         content:
@@ -96,7 +96,7 @@ function Landing() {
               Your customers book. <span className="text-primary">WhatsApp confirms.</span>
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
-              Rezavu gives every island business a booking link that works with the tools your
+              Randevou gives every island business a booking link that works with the tools your
               customers already use. No app. No friction. No no-shows.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -237,7 +237,7 @@ function Landing() {
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <BrandMark className="h-5 w-5" />
-              <span className="text-sm font-bold text-foreground">Rezavu</span>
+              <span className="text-sm font-bold text-foreground">Randevou</span>
               <span className="text-xs text-muted-foreground">by Octolabs · Mauritius 🇲🇺</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">

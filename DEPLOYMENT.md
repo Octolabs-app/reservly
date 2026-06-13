@@ -1,15 +1,15 @@
 # Deployment — Cloudflare Pages (D1 + KV)
 
-Rezavu deploys to **Cloudflare Pages** with **D1** (database) and **KV**
+Randevou deploys to **Cloudflare Pages** with **D1** (database) and **KV**
 (session cache). The public production domain is
-**https://rezavu.octolabs.app** — the default `rezavu.pages.dev` URL is
+**https://randevou.octolabs.app** — the default `randevou.pages.dev` URL is
 internal only and must never be customer-facing.
 
 ## Current state (2026-06-11)
 
-- `rezavu.pages.dev` answers **522** — the Pages project is not serving the
+- `randevou.pages.dev` answers **522** — the Pages project is not serving the
   app yet (no successful deployment, or the project name is held elsewhere).
-- `rezavu.octolabs.app` has **no DNS record** — custom domain not configured.
+- `randevou.octolabs.app` has **no DNS record** — custom domain not configured.
 - No Cloudflare credentials exist on this machine (`wrangler whoami` →
   not authenticated). **Every step below needs Allan to run `wrangler login`
   once (or create an API token).**
@@ -32,28 +32,28 @@ wrangler login                       # opens browser, authorise the Octolabs acc
 # 1. D1 database — wrangler.toml already references database_id
 #    7220664c-4098-4dcf-8030-470443007e2f. If that ID does not exist in your
 #    account, create a fresh one and update wrangler.toml:
-wrangler d1 create rezavu-db
+wrangler d1 create randevou-db
 
 # 2. KV namespace — same: wrangler.toml references
 #    bfaeb12444044848bb6b60a09e112953. Verify or recreate:
-wrangler kv namespace create rezavu-sessions
+wrangler kv namespace create randevou-sessions
 
 # 3. Apply BOTH migrations (order matters):
-wrangler d1 execute rezavu-db --remote --file=migrations/0001_rezavu_core.sql
-wrangler d1 execute rezavu-db --remote --file=migrations/0002_booking_rules.sql
+wrangler d1 execute randevou-db --remote --file=migrations/0001_rezavu_core.sql
+wrangler d1 execute randevou-db --remote --file=migrations/0002_booking_rules.sql
 
 # 4. Create the Pages project and deploy:
 npm run build
-wrangler pages deploy ./dist --project-name=rezavu
+wrangler pages deploy ./dist --project-name=randevou
 
 # 5. Secrets (Pages → Settings → Environment variables, or:)
-wrangler pages secret put TWILIO_ACCOUNT_SID --project-name=rezavu
-wrangler pages secret put TWILIO_AUTH_TOKEN --project-name=rezavu
-wrangler pages secret put TWILIO_WHATSAPP_FROM --project-name=rezavu
-wrangler pages secret put STRIPE_SECRET_KEY --project-name=rezavu
-wrangler pages secret put STRIPE_WEBHOOK_SECRET --project-name=rezavu
-wrangler pages secret put STRIPE_PRICE_PRO_MONTHLY --project-name=rezavu
-wrangler pages secret put STRIPE_PRICE_STUDIO_MONTHLY --project-name=rezavu
+wrangler pages secret put TWILIO_ACCOUNT_SID --project-name=randevou
+wrangler pages secret put TWILIO_AUTH_TOKEN --project-name=randevou
+wrangler pages secret put TWILIO_WHATSAPP_FROM --project-name=randevou
+wrangler pages secret put STRIPE_SECRET_KEY --project-name=randevou
+wrangler pages secret put STRIPE_WEBHOOK_SECRET --project-name=randevou
+wrangler pages secret put STRIPE_PRICE_PRO_MONTHLY --project-name=randevou
+wrangler pages secret put STRIPE_PRICE_STUDIO_MONTHLY --project-name=randevou
 ```
 
 Twilio and Stripe secrets are **optional at launch** — without them the app
@@ -63,29 +63,29 @@ message instead of Stripe checkout.
 ## Custom domain (hides pages.dev from users)
 
 1. Cloudflare dashboard → Pages → rezavu → **Custom domains** →
-   Add `rezavu.octolabs.app`. Since `octolabs.app` is already on Cloudflare,
+   Add `randevou.octolabs.app`. Since `octolabs.app` is already on Cloudflare,
    the CNAME is created automatically.
 2. Build-time env var (Pages → Settings → Environment variables, Production):
-   - `VITE_SITE_URL=https://rezavu.octolabs.app`
-   - `SITE_URL=https://rezavu.octolabs.app` (also in `wrangler.toml` [vars])
-3. Re-deploy after setting build vars (VITE_ vars are baked at build time).
+   - `VITE_SITE_URL=https://randevou.octolabs.app`
+   - `SITE_URL=https://randevou.octolabs.app` (also in `wrangler.toml` [vars])
+3. Re-deploy after setting build vars (VITE\_ vars are baked at build time).
 
 **What can and cannot be hidden:**
 
-- `rezavu.pages.dev` always exists — Cloudflare does not allow deleting the
+- `randevou.pages.dev` always exists — Cloudflare does not allow deleting the
   default Pages subdomain. That is fine: it is never shown to users.
 - Everything customer-facing (dashboard share links, WhatsApp messages,
   booking confirmations, metadata) is generated from `SITE_URL` /
   `VITE_SITE_URL`, so with the vars above users only ever see
-  `rezavu.octolabs.app`.
+  `randevou.octolabs.app`.
 - Optionally, add a Bulk Redirect in Cloudflare from
-  `rezavu.pages.dev/*` → `https://rezavu.octolabs.app/$1` so even direct
+  `randevou.pages.dev/*` → `https://randevou.octolabs.app/$1` so even direct
   visits land on the real domain.
 
 ## Webhooks (after the domain is live)
 
-- Twilio WhatsApp inbound: `https://rezavu.octolabs.app/api/twilio/inbound`
-- Stripe webhook: `https://rezavu.octolabs.app/api/stripe/webhook`
+- Twilio WhatsApp inbound: `https://randevou.octolabs.app/api/twilio/inbound`
+- Stripe webhook: `https://randevou.octolabs.app/api/stripe/webhook`
 
 ## Manual checks after deploy
 

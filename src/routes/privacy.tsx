@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy — Rezavu" },
-      { name: "description", content: "Rezavu privacy notice." },
+      { title: "Privacy — Randevou" },
+      { name: "description", content: "Randevou privacy notice." },
     ],
   }),
   component: PrivacyPage,
@@ -20,13 +20,13 @@ function PrivacyPage() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Privacy notice</h1>
         <Panel className="mt-6 space-y-4 p-6 text-sm leading-relaxed text-muted-foreground">
           <p>
-            Rezavu stores business profile details, service details, availability, and customer
+            Randevou stores business profile details, service details, availability, and customer
             booking details so bookings can be confirmed and managed.
           </p>
           <p>
             WhatsApp numbers are used for booking confirmations, owner alerts, cancellations, and
             customer replies. Messages are delivered through Twilio. Payment data is handled by
-            Stripe and is never stored by Rezavu. Application data is hosted on Cloudflare.
+            Stripe and is never stored by Randevou. Application data is hosted on Cloudflare.
           </p>
           <p>
             Business owners can delete their account and all associated data at any time from

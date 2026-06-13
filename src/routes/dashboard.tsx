@@ -1,12 +1,12 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Brand } from "@/components/rezavu/AppShell";
+import { Brand } from "@/components/randevou/AppShell";
 import { getCurrentOwner } from "@/lib/cf/auth";
-import type { Owner } from "@/lib/rezavu/types";
+import type { Owner } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
-    meta: [{ title: "Dashboard — Rezavu" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Dashboard — Randevou" }, { name: "robots", content: "noindex" }],
   }),
   component: DashboardLayout,
 });

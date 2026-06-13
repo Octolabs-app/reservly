@@ -1,7 +1,7 @@
 {
-  "name": "rezavu",
+  "name": "randevou",
   "version": "0.1.0",
-  "description": "Rezavu — WhatsApp-native booking for island businesses, by Octolabs.",
+  "description": "Randevou — WhatsApp-native booking for island businesses, by Octolabs.",
   "license": "UNLICENSED",
   "private": true,
   "sideEffects": false,

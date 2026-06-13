@@ -1,44 +1,63 @@
 # wrangler.toml
-# Cloudflare Pages configuration for Rezavu.
+# Cloudflare Pages configuration for Randevou.
 # The full deploy runbook lives in DEPLOYMENT.md — follow that, not this header.
 #
 # Quick reference:
 #   wrangler login
-#   wrangler d1 create rezavu-db                  → update database_id below
-#   wrangler kv namespace create rezavu-sessions  → update id below
-#   wrangler d1 execute rezavu-db --remote --file=migrations/0001_rezavu_core.sql
-#   wrangler d1 execute rezavu-db --remote --file=migrations/0002_booking_rules.sql
+#   # D1 + KV already created via Cloudflare API (IDs below); to recreate:
+#   #   wrangler d1 create randevou-db                  → update database_id below
+#   #   wrangler kv namespace create randevou-sessions  → update id below
+#   wrangler d1 execute randevou-db --remote --file=migrations/0001_rezavu_core.sql
+#   wrangler d1 execute randevou-db --remote --file=migrations/0002_booking_rules.sql
+#   wrangler d1 execute randevou-db --remote --file=migrations/0003_admin_and_billing.sql
 #   npm run build
-#   wrangler pages deploy ./dist --project-name=rezavu
-#   wrangler pages secret put <NAME> --project-name=rezavu   (see [secrets] list below)
+#   wrangler pages deploy ./dist --project-name=randevou
+#   wrangler pages secret put <NAME> --project-name=randevou   (see [secrets] list below)
 
-name = "rezavu"
+name = "randevou"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
 # ─── D1 Database ─────────────────────────────────────────────────────────────
-# Created 2026-06-12 via Cloudflare API; migrations 0001 + 0002 applied.
+# randevou-db — created 2026-06-13 via Cloudflare API; migrations 0001+0002+0003 applied.
 [[d1_databases]]
 binding = "DB"
-database_name = "rezavu-db"
-database_id = "2d8a263f-5172-4f50-ad5b-2be16164634a"
+database_name = "randevou-db"
+database_id = "de89f943-0ad7-452f-9dba-e9bf27df839f"
 
-# ─── KV Namespace (session cache) ────────────────────────────────────────────
-# Created 2026-06-12 via Cloudflare API.
+# ─── KV Namespace (session cache + rate-limit counters) ──────────────────────
+# randevou-sessions — created 2026-06-13 via Cloudflare API.
 [[kv_namespaces]]
 binding = "KV"
-id = "87ba9053bea9483a82ec921123839504"
+id = "e4babc1547ca4b7b8f2aaad412801836"
 
 # ─── Environment variables (non-secret) ──────────────────────────────────────
 [vars]
-SITE_URL = "https://rezavu.octolabs.app"
+SITE_URL = "https://randevou.octolabs.app"
 
-# ─── Secrets (set via `wrangler pages secret put <NAME> --project-name=rezavu`)
-# TWILIO_ACCOUNT_SID
-# TWILIO_AUTH_TOKEN
-# TWILIO_WHATSAPP_FROM
-# STRIPE_SECRET_KEY
-# STRIPE_WEBHOOK_SECRET
-# STRIPE_PRICE_PRO_MONTHLY
-# STRIPE_PRICE_STUDIO_MONTHLY
+# ─── Secrets (set via `wrangler pages secret put <NAME> --project-name=randevou`)
+# Auth / platform:
+#   ADMIN_EMAILS                 comma-separated platform-admin owner emails
+# Messaging (Twilio WhatsApp):
+#   TWILIO_ACCOUNT_SID
+#   TWILIO_AUTH_TOKEN
+#   TWILIO_WHATSAPP_FROM
+# Billing — Paddle (primary, individual/sole-trader):
+#   PADDLE_API_KEY
+#   PADDLE_WEBHOOK_SECRET
+#   PADDLE_ENVIRONMENT           sandbox | production
+#   PADDLE_PRICE_PRO
+#   PADDLE_PRICE_STUDIO
+# Billing — Dodo Payments (backup, individual):
+#   DODO_API_KEY
+#   DODO_WEBHOOK_SECRET
+#   DODO_ENVIRONMENT             test | live
+#   DODO_PRICE_PRO
+#   DODO_PRICE_STUDIO
+# Billing — PayPal manual fallback: no secrets; admin records payments in-app.
+# Billing — Stripe (future only, do not configure yet):
+#   STRIPE_SECRET_KEY
+#   STRIPE_WEBHOOK_SECRET
+#   STRIPE_PRICE_PRO_MONTHLY
+#   STRIPE_PRICE_STUDIO_MONTHLY

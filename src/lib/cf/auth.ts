@@ -10,8 +10,8 @@
 //   - In local dev (no D1 binding) falls back to the existing dev-store owner
 
 import { getD1, getKV, d1First, d1Run, isD1Enabled } from "./db";
-import { getDevOwner } from "@/lib/rezavu/dev-store";
-import type { Owner } from "@/lib/rezavu/types";
+import { getDevOwner } from "@/lib/randevou/dev-store";
+import type { Owner } from "@/lib/randevou/types";
 
 const SESSION_COOKIE = "rzv_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days

@@ -30,7 +30,7 @@ export function Brand({ size = "md", light = false }: { size?: "sm" | "md"; ligh
     <Link to="/" className="flex items-center gap-2">
       <BrandMark className={size === "sm" ? "h-6 w-6" : "h-7 w-7"} />
       <span className={`font-display ${text} ${light ? "text-white" : "text-foreground"}`}>
-        Rezavu
+        Randevou
       </span>
     </Link>
   );

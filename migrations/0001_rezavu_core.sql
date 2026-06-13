@@ -1,4 +1,4 @@
--- Rezavu D1 Schema - Migration 0001
+-- Randevou D1 Schema - Migration 0001
 -- Replaces: supabase/migrations/20260611000000_rezavu_core.sql
 -- Target: Cloudflare D1 (SQLite dialect)
 -- Auth: Cloudflare-issued JWT sessions stored in KV (no Supabase auth.users)

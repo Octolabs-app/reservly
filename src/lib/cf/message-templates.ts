@@ -1,4 +1,4 @@
-import type { BookingLanguage } from "@/lib/rezavu/types";
+import type { BookingLanguage } from "@/lib/randevou/types";
 
 export type BookingMessageContext = {
   customerName: string;

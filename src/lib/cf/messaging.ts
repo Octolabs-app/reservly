@@ -11,8 +11,8 @@ import {
   renderReplyAck,
   type BookingMessageContext,
 } from "./message-templates";
-import { formatDateLabel, formatTimeLabel } from "@/lib/rezavu/slots";
-import type { BookingLanguage } from "@/lib/rezavu/types";
+import { formatDateLabel, formatTimeLabel } from "@/lib/randevou/slots";
+import type { BookingLanguage } from "@/lib/randevou/types";
 
 type MessageInput = {
   businessId?: string | null;

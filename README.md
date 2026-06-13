@@ -1,6 +1,6 @@
-# Rezavu
+# Randevou
 
-Rezavu by Octolabs — WhatsApp-native booking for island businesses
+Randevou by Octolabs — WhatsApp-native booking for island businesses
 (salons, barbers, beauty, wellness, tutors) in Mauritius, Réunion and
 Seychelles. Customers tap a link, pick a slot, and get a WhatsApp
 confirmation. No app, no account.

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requireApiOwner, jsonError } from "@/lib/cf/api";
 import { createBusiness, updateBusiness } from "@/lib/cf/data";
-import type { BusinessInput } from "@/lib/rezavu/types";
+import type { BusinessInput } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/api/dashboard/business")({
   component: Empty,

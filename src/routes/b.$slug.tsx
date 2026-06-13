@@ -1,23 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 import { createBooking, getAvailableSlots, getPublicBusinessBySlug } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/rezavu/env";
+import { getSiteUrl } from "@/lib/randevou/env";
 import {
   defaultPageLang,
   showsLangToggle,
   slotReasonLabel,
   t,
   type PageLang,
-} from "@/lib/rezavu/i18n";
-import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
-import { addDaysToDateInput, mauritiusTodayInput } from "@/lib/rezavu/slots";
-import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/rezavu/types";
+} from "@/lib/randevou/i18n";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
+import { addDaysToDateInput, mauritiusTodayInput } from "@/lib/randevou/slots";
+import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/b/$slug")({
   head: ({ params }) => ({
     meta: [
-      { title: `Book with ${params.slug.replace(/-/g, " ")} — Rezavu` },
+      { title: `Book with ${params.slug.replace(/-/g, " ")} — Randevou` },
       {
         name: "description",
         content: "Pick a service and time. Confirmation arrives straight on WhatsApp.",

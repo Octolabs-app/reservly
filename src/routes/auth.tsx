@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
-    meta: [{ title: "Sign in — Rezavu" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Sign in — Randevou" }, { name: "robots", content: "noindex" }],
   }),
   component: AuthPage,
 });

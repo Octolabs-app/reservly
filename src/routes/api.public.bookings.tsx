@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { createBooking } from "@/lib/cf/data";
 import { jsonError } from "@/lib/cf/api";
 import { allowRequest, clientIp } from "@/lib/cf/rate-limit";
-import { normalizeWhatsAppNumber } from "@/lib/rezavu/phone";
-import type { BookingInput } from "@/lib/rezavu/types";
+import { normalizeWhatsAppNumber } from "@/lib/randevou/phone";
+import type { BookingInput } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/api/public/bookings")({
   component: Empty,

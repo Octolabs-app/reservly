@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms — Rezavu" },
-      { name: "description", content: "Rezavu terms of service." },
+      { title: "Terms — Randevou" },
+      { name: "description", content: "Randevou terms of service." },
     ],
   }),
   component: TermsPage,
@@ -20,7 +20,7 @@ function TermsPage() {
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Terms of service</h1>
         <Panel className="mt-6 space-y-4 p-6 text-sm leading-relaxed text-muted-foreground">
           <p>
-            Rezavu helps businesses collect booking requests and manage availability. Businesses
+            Randevou helps businesses collect booking requests and manage availability. Businesses
             remain responsible for service delivery, customer communication, pricing, and local
             compliance.
           </p>
@@ -30,7 +30,7 @@ function TermsPage() {
           </p>
           <p>
             WhatsApp delivery and card payments depend on third-party providers (Twilio and Stripe).
-            Rezavu is not liable for outages or delivery failures of those providers.
+            Randevou is not liable for outages or delivery failures of those providers.
           </p>
         </Panel>
       </Page>

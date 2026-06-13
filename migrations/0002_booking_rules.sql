@@ -1,4 +1,4 @@
--- Rezavu D1 Schema - Migration 0002
+-- Randevou D1 Schema - Migration 0002
 -- Booking rules: owner control over scheduling behaviour.
 --
 -- businesses.min_notice_minutes   How close to the appointment a customer can still book.

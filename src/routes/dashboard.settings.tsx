@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { EmptyState, Panel } from "@/components/rezavu/AppShell";
+import { EmptyState, Panel } from "@/components/randevou/AppShell";
 import {
   createService,
   deleteAccount,
@@ -10,8 +10,8 @@ import {
   updateBusiness,
   updateService,
 } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/rezavu/env";
-import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
+import { getSiteUrl } from "@/lib/randevou/env";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
 import type {
   Availability,
   BookingLanguage,
@@ -19,7 +19,7 @@ import type {
   DashboardData,
   Plan,
   Service,
-} from "@/lib/rezavu/types";
+} from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/dashboard/settings")({
   component: SettingsTab,

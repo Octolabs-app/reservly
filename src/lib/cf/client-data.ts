@@ -1,4 +1,4 @@
-import { saveLastBooking } from "@/lib/rezavu/dev-store";
+import { saveLastBooking } from "@/lib/randevou/dev-store";
 import type {
   Availability,
   AvailabilityInput,
@@ -11,7 +11,7 @@ import type {
   Service,
   ServiceInput,
   Slot,
-} from "@/lib/rezavu/types";
+} from "@/lib/randevou/types";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);

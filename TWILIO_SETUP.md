@@ -16,7 +16,7 @@ POST {SITE_URL}/api/twilio/inbound
 
 ## Reply Parsing
 
-Rezavu handles:
+Randevou handles:
 
 - `CONFIRM`, `CONFIRMED`, `YES`, `OUI` -> confirm booking
 - `CANCEL`, `CANCELLED`, `NON` -> cancel booking

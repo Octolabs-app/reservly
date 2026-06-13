@@ -1,20 +1,20 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Page, Panel, SiteHeader } from "@/components/rezavu/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 import { getCurrentOwner } from "@/lib/cf/auth";
 import { createBusiness, createService, updateAvailability } from "@/lib/cf/client-data";
-import { getSiteUrl } from "@/lib/rezavu/env";
-import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/rezavu/phone";
-import type { BookingLanguage } from "@/lib/rezavu/types";
+import { getSiteUrl } from "@/lib/randevou/env";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
+import type { BookingLanguage } from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Set up your business — Rezavu" },
+      { title: "Set up your business — Randevou" },
       {
         name: "description",
         content:
-          "Three steps to get your Rezavu booking link live: business info, services, opening hours.",
+          "Three steps to get your Randevou booking link live: business info, services, opening hours.",
       },
     ],
   }),
@@ -191,7 +191,7 @@ function OnboardingPage() {
             </div>
             <div className="p-6">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Create a free account (or sign in) so Rezavu can save your business, services, hours
+                Create a free account (or sign in) so Randevou can save your business, services, hours
                 and booking link.
               </p>
               <a href="/auth?redirectTo=/onboarding" className="btn-solid mt-5 w-full py-3">

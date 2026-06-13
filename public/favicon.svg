@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Rezavu mark — calendar tile with confirmation check -->
+  <!-- Randevou mark — calendar tile with confirmation check -->
   <rect width="64" height="64" rx="14" fill="#1B4FD8"/>
   <!-- calendar binding posts -->
   <rect x="18" y="10" width="5" height="11" rx="2.5" fill="#C7D2FE"/>
