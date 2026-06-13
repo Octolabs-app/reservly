@@ -1,4 +1,5 @@
 import { generateUniqueSlug } from "./slug";
+import { generateBookingRef } from "./ref";
 import {
   calculateMonthlyUsage,
   dateInputFromDate,
@@ -32,12 +33,12 @@ type DevState = {
   bookings: Booking[];
 };
 
-const STATE_KEY = "rezavu_dev_state_v4";
-const LAST_BOOKING_KEY = "rezavu_last_booking";
+const STATE_KEY = "randevou_dev_state_v1";
+const LAST_BOOKING_KEY = "randevou_last_booking";
 
 const owner: Owner = {
   id: "dev-owner",
-  email: "owner@rezavu.local",
+  email: "owner@randevou.local",
   name: "Marie Rose",
 };
 
@@ -70,6 +71,7 @@ function defaultState(): DevState {
     minNoticeMinutes: DEFAULT_MIN_NOTICE_MINUTES,
     maxAdvanceDays: DEFAULT_MAX_ADVANCE_DAYS,
     slotIntervalMinutes: null,
+    noSameDay: false,
     createdAt: new Date().toISOString(),
   };
 
@@ -147,6 +149,7 @@ function bookingSeed(
     endAt: new Date(new Date(startAt).getTime() + service.durationMinutes * 60_000).toISOString(),
     status,
     source: "public",
+    bookingRef: generateBookingRef(),
     createdAt: new Date().toISOString(),
   };
 }
@@ -239,6 +242,7 @@ export async function createDevBusiness(input: BusinessInput) {
       minNoticeMinutes: input.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
       maxAdvanceDays: input.maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
       slotIntervalMinutes: input.slotIntervalMinutes ?? null,
+      noSameDay: input.noSameDay ?? false,
       createdAt: new Date().toISOString(),
     };
 
@@ -274,6 +278,7 @@ export async function updateDevBusiness(input: Partial<BusinessInput> & { id: st
         "slotIntervalMinutes" in input
           ? (input.slotIntervalMinutes ?? null)
           : business.slotIntervalMinutes,
+      noSameDay: input.noSameDay ?? business.noSameDay,
       updatedAt: new Date().toISOString(),
     });
     return business;
@@ -391,6 +396,7 @@ export async function createDevBooking(input: BookingInput) {
       endAt,
       status: "pending",
       source: "public",
+      bookingRef: generateBookingRef(),
       notes: input.notes,
       createdAt: new Date().toISOString(),
     };

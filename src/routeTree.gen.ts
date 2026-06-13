@@ -14,6 +14,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
@@ -39,6 +40,13 @@ import { Route as ApiAuthSignoutRouteImport } from './routes/api.auth.signout'
 import { Route as ApiAuthSigninRouteImport } from './routes/api.auth.signin'
 import { Route as ApiAuthMeRouteImport } from './routes/api.auth.me'
 import { Route as ApiAuthDeleteAccountRouteImport } from './routes/api.auth.delete-account'
+import { Route as ApiAdminSystemRouteImport } from './routes/api.admin.system'
+import { Route as ApiAdminOwnersRouteImport } from './routes/api.admin.owners'
+import { Route as ApiAdminOverviewRouteImport } from './routes/api.admin.overview'
+import { Route as ApiAdminMessagingRouteImport } from './routes/api.admin.messaging'
+import { Route as ApiAdminBusinessesRouteImport } from './routes/api.admin.businesses'
+import { Route as ApiAdminBookingsRouteImport } from './routes/api.admin.bookings'
+import { Route as ApiAdminAuditRouteImport } from './routes/api.admin.audit'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -63,6 +71,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -193,9 +206,45 @@ const ApiAuthDeleteAccountRoute = ApiAuthDeleteAccountRouteImport.update({
   path: '/delete-account',
   getParentRoute: () => ApiAuthRoute,
 } as any)
+const ApiAdminSystemRoute = ApiAdminSystemRouteImport.update({
+  id: '/api/admin/system',
+  path: '/api/admin/system',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminOwnersRoute = ApiAdminOwnersRouteImport.update({
+  id: '/api/admin/owners',
+  path: '/api/admin/owners',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminOverviewRoute = ApiAdminOverviewRouteImport.update({
+  id: '/api/admin/overview',
+  path: '/api/admin/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMessagingRoute = ApiAdminMessagingRouteImport.update({
+  id: '/api/admin/messaging',
+  path: '/api/admin/messaging',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminBusinessesRoute = ApiAdminBusinessesRouteImport.update({
+  id: '/api/admin/businesses',
+  path: '/api/admin/businesses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminBookingsRoute = ApiAdminBookingsRouteImport.update({
+  id: '/api/admin/bookings',
+  path: '/api/admin/bookings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminAuditRoute = ApiAdminAuditRouteImport.update({
+  id: '/api/admin/audit',
+  path: '/api/admin/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/onboarding': typeof OnboardingRoute
@@ -206,6 +255,13 @@ export interface FileRoutesByFullPath {
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/admin/audit': typeof ApiAdminAuditRoute
+  '/api/admin/bookings': typeof ApiAdminBookingsRoute
+  '/api/admin/businesses': typeof ApiAdminBusinessesRoute
+  '/api/admin/messaging': typeof ApiAdminMessagingRoute
+  '/api/admin/overview': typeof ApiAdminOverviewRoute
+  '/api/admin/owners': typeof ApiAdminOwnersRoute
+  '/api/admin/system': typeof ApiAdminSystemRoute
   '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
@@ -228,6 +284,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
@@ -237,6 +294,13 @@ export interface FileRoutesByTo {
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/admin/audit': typeof ApiAdminAuditRoute
+  '/api/admin/bookings': typeof ApiAdminBookingsRoute
+  '/api/admin/businesses': typeof ApiAdminBusinessesRoute
+  '/api/admin/messaging': typeof ApiAdminMessagingRoute
+  '/api/admin/overview': typeof ApiAdminOverviewRoute
+  '/api/admin/owners': typeof ApiAdminOwnersRoute
+  '/api/admin/system': typeof ApiAdminSystemRoute
   '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
@@ -260,6 +324,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/onboarding': typeof OnboardingRoute
@@ -270,6 +335,13 @@ export interface FileRoutesById {
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/admin/audit': typeof ApiAdminAuditRoute
+  '/api/admin/bookings': typeof ApiAdminBookingsRoute
+  '/api/admin/businesses': typeof ApiAdminBusinessesRoute
+  '/api/admin/messaging': typeof ApiAdminMessagingRoute
+  '/api/admin/overview': typeof ApiAdminOverviewRoute
+  '/api/admin/owners': typeof ApiAdminOwnersRoute
+  '/api/admin/system': typeof ApiAdminSystemRoute
   '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
@@ -294,6 +366,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
     | '/dashboard'
     | '/onboarding'
@@ -304,6 +377,13 @@ export interface FileRouteTypes {
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/admin/audit'
+    | '/api/admin/bookings'
+    | '/api/admin/businesses'
+    | '/api/admin/messaging'
+    | '/api/admin/overview'
+    | '/api/admin/owners'
+    | '/api/admin/system'
     | '/api/auth/delete-account'
     | '/api/auth/me'
     | '/api/auth/signin'
@@ -326,6 +406,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
     | '/onboarding'
     | '/privacy'
@@ -335,6 +416,13 @@ export interface FileRouteTypes {
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard'
+    | '/api/admin/audit'
+    | '/api/admin/bookings'
+    | '/api/admin/businesses'
+    | '/api/admin/messaging'
+    | '/api/admin/overview'
+    | '/api/admin/owners'
+    | '/api/admin/system'
     | '/api/auth/delete-account'
     | '/api/auth/me'
     | '/api/auth/signin'
@@ -357,6 +445,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
     | '/dashboard'
     | '/onboarding'
@@ -367,6 +456,13 @@ export interface FileRouteTypes {
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/admin/audit'
+    | '/api/admin/bookings'
+    | '/api/admin/businesses'
+    | '/api/admin/messaging'
+    | '/api/admin/overview'
+    | '/api/admin/owners'
+    | '/api/admin/system'
     | '/api/auth/delete-account'
     | '/api/auth/me'
     | '/api/auth/signin'
@@ -390,6 +486,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   OnboardingRoute: typeof OnboardingRoute
@@ -397,6 +494,13 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   ApiAuthRoute: typeof ApiAuthRouteWithChildren
   BSlugRoute: typeof BSlugRoute
+  ApiAdminAuditRoute: typeof ApiAdminAuditRoute
+  ApiAdminBookingsRoute: typeof ApiAdminBookingsRoute
+  ApiAdminBusinessesRoute: typeof ApiAdminBusinessesRoute
+  ApiAdminMessagingRoute: typeof ApiAdminMessagingRoute
+  ApiAdminOverviewRoute: typeof ApiAdminOverviewRoute
+  ApiAdminOwnersRoute: typeof ApiAdminOwnersRoute
+  ApiAdminSystemRoute: typeof ApiAdminSystemRoute
   ApiDashboardAvailabilityRoute: typeof ApiDashboardAvailabilityRoute
   ApiDashboardBookingActionRoute: typeof ApiDashboardBookingActionRoute
   ApiDashboardBusinessRoute: typeof ApiDashboardBusinessRoute
@@ -448,6 +552,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -625,6 +736,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthDeleteAccountRouteImport
       parentRoute: typeof ApiAuthRoute
     }
+    '/api/admin/system': {
+      id: '/api/admin/system'
+      path: '/api/admin/system'
+      fullPath: '/api/admin/system'
+      preLoaderRoute: typeof ApiAdminSystemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/owners': {
+      id: '/api/admin/owners'
+      path: '/api/admin/owners'
+      fullPath: '/api/admin/owners'
+      preLoaderRoute: typeof ApiAdminOwnersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/overview': {
+      id: '/api/admin/overview'
+      path: '/api/admin/overview'
+      fullPath: '/api/admin/overview'
+      preLoaderRoute: typeof ApiAdminOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/messaging': {
+      id: '/api/admin/messaging'
+      path: '/api/admin/messaging'
+      fullPath: '/api/admin/messaging'
+      preLoaderRoute: typeof ApiAdminMessagingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/businesses': {
+      id: '/api/admin/businesses'
+      path: '/api/admin/businesses'
+      fullPath: '/api/admin/businesses'
+      preLoaderRoute: typeof ApiAdminBusinessesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/bookings': {
+      id: '/api/admin/bookings'
+      path: '/api/admin/bookings'
+      fullPath: '/api/admin/bookings'
+      preLoaderRoute: typeof ApiAdminBookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/audit': {
+      id: '/api/admin/audit'
+      path: '/api/admin/audit'
+      fullPath: '/api/admin/audit'
+      preLoaderRoute: typeof ApiAdminAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -665,6 +825,7 @@ const ApiAuthRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRouteWithChildren,
   OnboardingRoute: OnboardingRoute,
@@ -672,6 +833,13 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   ApiAuthRoute: ApiAuthRouteWithChildren,
   BSlugRoute: BSlugRoute,
+  ApiAdminAuditRoute: ApiAdminAuditRoute,
+  ApiAdminBookingsRoute: ApiAdminBookingsRoute,
+  ApiAdminBusinessesRoute: ApiAdminBusinessesRoute,
+  ApiAdminMessagingRoute: ApiAdminMessagingRoute,
+  ApiAdminOverviewRoute: ApiAdminOverviewRoute,
+  ApiAdminOwnersRoute: ApiAdminOwnersRoute,
+  ApiAdminSystemRoute: ApiAdminSystemRoute,
   ApiDashboardAvailabilityRoute: ApiDashboardAvailabilityRoute,
   ApiDashboardBookingActionRoute: ApiDashboardBookingActionRoute,
   ApiDashboardBusinessRoute: ApiDashboardBusinessRoute,

@@ -127,6 +127,8 @@ export function generateSlots({
   monthlyFull,
   stepMinutes = 30,
   minNoticeMinutes = 0,
+  noSameDay = false,
+  now = Date.now(),
 }: {
   date: string;
   service: Service;
@@ -135,6 +137,8 @@ export function generateSlots({
   monthlyFull: boolean;
   stepMinutes?: number;
   minNoticeMinutes?: number;
+  noSameDay?: boolean;
+  now?: number;
 }): Slot[] {
   const dayOfWeek = getMauritiusDayOfWeek(date);
   const day = availability.find((entry) => entry.dayOfWeek === dayOfWeek);
@@ -142,9 +146,11 @@ export function generateSlots({
 
   const open = minutesFromTime(day.opensAt);
   const close = minutesFromTime(day.closesAt);
-  const now = Date.now();
   const minNoticeMs = Math.max(0, minNoticeMinutes) * 60_000;
   const step = stepMinutes > 0 ? stepMinutes : 30; // guard against a zero/negative interval looping forever
+  // When the owner disables same-day booking, the whole requested date is
+  // blocked if it is "today" in Mauritius local time.
+  const blockedSameDay = noSameDay && date === mauritiusDateFromIso(new Date(now).toISOString());
 
   function overlapsBooking(startMs: number, endMs: number) {
     return bookings.some((booking) => {
@@ -160,6 +166,7 @@ export function generateSlots({
   function slotReason(startMs: number, endMs: number): Slot["reason"] {
     if (monthlyFull) return "full";
     if (startMs <= now) return "past";
+    if (blockedSameDay) return "same_day";
     if (startMs - now < minNoticeMs) return "notice";
     if (overlapsBooking(startMs, endMs)) return "taken";
     return undefined;

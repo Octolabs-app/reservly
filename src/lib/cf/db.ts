@@ -46,14 +46,30 @@ export type D1ExecResult = {
 export type CloudflareEnv = {
   DB: D1Database;
   KV: KVNamespace;
+  SITE_URL?: string;
+  // Platform admin gate (comma-separated owner emails)
+  ADMIN_EMAILS?: string;
+  // Messaging — Twilio WhatsApp
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_WHATSAPP_FROM?: string;
+  // Billing — Paddle (primary, individual/sole-trader)
+  PADDLE_API_KEY?: string;
+  PADDLE_WEBHOOK_SECRET?: string;
+  PADDLE_ENVIRONMENT?: string;
+  PADDLE_PRICE_PRO?: string;
+  PADDLE_PRICE_STUDIO?: string;
+  // Billing — Dodo Payments (backup, individual)
+  DODO_API_KEY?: string;
+  DODO_WEBHOOK_SECRET?: string;
+  DODO_ENVIRONMENT?: string;
+  DODO_PRICE_PRO?: string;
+  DODO_PRICE_STUDIO?: string;
+  // Billing — Stripe (future only)
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_PRO_MONTHLY?: string;
   STRIPE_PRICE_STUDIO_MONTHLY?: string;
-  SITE_URL?: string;
 };
 
 export type KVNamespace = {

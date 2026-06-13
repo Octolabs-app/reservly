@@ -2,10 +2,39 @@ export const FREE_BOOKING_LIMIT = 15;
 export const DEFAULT_MIN_NOTICE_MINUTES = 120;
 export const DEFAULT_MAX_ADVANCE_DAYS = 30;
 export const DEFAULT_SLOT_INTERVAL_MINUTES = 30;
+/** Hard ceiling for how far ahead the public page will ever render dates. */
+export const MAX_ADVANCE_DAYS_CEILING = 365;
 
 export type Plan = "free" | "pro" | "studio";
 export type BookingStatus = "pending" | "confirmed" | "cancelled";
 export type BookingLanguage = "English" | "Francais" | "Both";
+
+/** Billing providers — no-BRN-friendly. Stripe is future-only. */
+export type BillingProvider =
+  | "manual"
+  | "paddle_individual"
+  | "dodo_individual"
+  | "paypal_manual"
+  | "stripe_future";
+
+export type SubscriptionStatus =
+  | "free"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "manual";
+
+export type Subscription = {
+  businessId: string;
+  provider: BillingProvider;
+  plan: Plan;
+  status: SubscriptionStatus;
+  paymentNote?: string | null;
+  paymentReference?: string | null;
+  currentPeriodEnd?: string | null;
+  updatedAt?: string;
+};
 
 export type Owner = {
   id: string;
@@ -28,6 +57,7 @@ export type Business = {
   minNoticeMinutes: number;
   maxAdvanceDays: number;
   slotIntervalMinutes: number | null;
+  noSameDay: boolean;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -64,6 +94,7 @@ export type Booking = {
   endAt: string;
   status: BookingStatus;
   source: "public" | "dashboard";
+  bookingRef?: string | null;
   notes?: string | null;
   createdAt?: string;
   serviceName?: string;
@@ -105,6 +136,7 @@ export type BusinessInput = {
   minNoticeMinutes?: number;
   maxAdvanceDays?: number;
   slotIntervalMinutes?: number | null;
+  noSameDay?: boolean;
 };
 
 export type ServiceInput = {
@@ -140,5 +172,5 @@ export type Slot = {
   time: string;
   startAt: string;
   available: boolean;
-  reason?: "past" | "closed" | "taken" | "full" | "notice";
+  reason?: "past" | "closed" | "taken" | "full" | "notice" | "same_day";
 };

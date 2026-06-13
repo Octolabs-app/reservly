@@ -67,6 +67,10 @@ const STRINGS = {
     fr: "Trop tôt — le commerce demande plus de préavis",
   },
   reasonClosed: { en: "Closed", fr: "Fermé" },
+  reasonSameDay: {
+    en: "Same-day booking not available",
+    fr: "Réservation le jour même indisponible",
+  },
   slotLegend: {
     en: "Crossed-out times are unavailable.",
     fr: "Les heures barrées ne sont pas disponibles.",
@@ -100,7 +104,7 @@ export function t(key: StringKey, lang: PageLang): string {
 }
 
 export function slotReasonLabel(
-  reason: "past" | "closed" | "taken" | "full" | "notice",
+  reason: "past" | "closed" | "taken" | "full" | "notice" | "same_day",
   lang: PageLang,
 ): string {
   const map = {
@@ -109,6 +113,7 @@ export function slotReasonLabel(
     full: "reasonFull",
     notice: "reasonNotice",
     closed: "reasonClosed",
+    same_day: "reasonSameDay",
   } as const;
   return t(map[reason], lang);
 }

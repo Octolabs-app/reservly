@@ -12,7 +12,13 @@ import {
 } from "@/lib/randevou/i18n";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
 import { addDaysToDateInput, mauritiusTodayInput } from "@/lib/randevou/slots";
-import type { BookingLanguage, PublicBusiness, Service, Slot } from "@/lib/randevou/types";
+import {
+  MAX_ADVANCE_DAYS_CEILING,
+  type BookingLanguage,
+  type PublicBusiness,
+  type Service,
+  type Slot,
+} from "@/lib/randevou/types";
 
 export const Route = createFileRoute("/b/$slug")({
   head: ({ params }) => ({
@@ -70,7 +76,9 @@ function BookingPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const langSetting = data?.business.bookingPageLanguage;
-  const maxDays = Math.min(data?.business.maxAdvanceDays ?? 14, 30);
+  // Honor the owner's max-advance setting (no hardcoded 30-day cap); only a
+  // sane ceiling so the date strip can't render an unbounded number of days.
+  const maxDays = Math.max(1, Math.min(data?.business.maxAdvanceDays ?? 14, MAX_ADVANCE_DAYS_CEILING));
   const dates = useMemo(() => {
     const today = mauritiusTodayInput();
     return Array.from({ length: maxDays }, (_, index) =>

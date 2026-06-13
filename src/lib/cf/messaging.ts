@@ -7,12 +7,42 @@ import { getCFEnv, getD1, d1All, d1First, d1Run } from "./db";
 import {
   renderBookingConfirmation,
   renderCancellationMessage,
+  renderChooseRefToCancel,
   renderOwnerBookingAlert,
+  renderRefNotFound,
   renderReplyAck,
   type BookingMessageContext,
 } from "./message-templates";
 import { formatDateLabel, formatTimeLabel } from "@/lib/randevou/slots";
+import { isBookingRef, normalizeBookingRef } from "@/lib/randevou/ref";
 import type { BookingLanguage } from "@/lib/randevou/types";
+
+/**
+ * Parse an inbound WhatsApp body into a command + optional booking reference.
+ * Supported: "/cancel", "cancel", "annuler", "/cancel RDV-8K2Q",
+ * "cancel 8K2Q", "annuler RDV-8K2Q", plus confirm variants.
+ */
+function parseInbound(body: string): {
+  command: "confirm" | "cancel" | null;
+  ref: string | null;
+} {
+  const tokens = body.trim().split(/\s+/).filter(Boolean);
+  const first = (tokens[0] ?? "").toLowerCase().replace(/^\//, "");
+  const CANCEL = ["cancel", "cancelled", "annuler", "annule", "non"];
+  const CONFIRM = ["confirm", "confirmed", "confirmer", "oui", "yes"];
+  let command: "confirm" | "cancel" | null = null;
+  if (CANCEL.includes(first)) command = "cancel";
+  else if (CONFIRM.includes(first)) command = "confirm";
+
+  let ref: string | null = null;
+  for (let i = command ? 1 : 0; i < tokens.length; i++) {
+    if (isBookingRef(tokens[i])) {
+      ref = normalizeBookingRef(tokens[i]);
+      break;
+    }
+  }
+  return { command, ref };
+}
 
 type MessageInput = {
   businessId?: string | null;
@@ -214,6 +244,7 @@ type InboundBookingRow = {
   customer_language: string;
   start_at: string;
   status: string;
+  booking_ref: string | null;
   service_name: string | null;
   service_price_label: string | null;
   business_name: string | null;
@@ -224,7 +255,7 @@ type InboundBookingRow = {
 
 const BOOKING_SELECT = `
   SELECT b.id, b.business_id, b.customer_name, b.customer_phone, b.customer_language,
-         b.start_at, b.status,
+         b.start_at, b.status, b.booking_ref,
          s.name as service_name, s.price_label as service_price_label,
          biz.name as business_name, biz.slug as business_slug,
          biz.whatsapp_number as business_whatsapp,
@@ -241,10 +272,20 @@ function bookingContext(row: InboundBookingRow): BookingMessageContext {
     businessName: row.business_name ?? "the business",
     serviceName: row.service_name ?? "your service",
     priceLabel: row.service_price_label,
+    bookingRef: row.booking_ref,
     dateLabel: formatDateLabel(row.start_at, { year: "numeric" }),
     timeLabel: formatTimeLabel(row.start_at),
     language: (row.customer_language as BookingLanguage) ?? "Both",
   };
+}
+
+async function applyStatus(bookingId: string, status: "confirmed" | "cancelled") {
+  const db = getD1()!;
+  await d1Run(
+    db
+      .prepare("UPDATE bookings SET status = ?, updated_at = datetime('now') WHERE id = ?")
+      .bind(status, bookingId),
+  );
 }
 
 export async function handleInboundWhatsAppReply(input: {
@@ -253,18 +294,15 @@ export async function handleInboundWhatsAppReply(input: {
   rawPayload?: unknown;
 }): Promise<InboundResult> {
   const db = getD1();
-  const normalized = input.body.trim().toUpperCase();
-  const command = ["CONFIRM", "CONFIRMED", "YES", "OUI"].includes(normalized)
-    ? "confirmed"
-    : ["CANCEL", "CANCELLED", "ANNULER", "NON"].includes(normalized)
-      ? "cancelled"
-      : null;
+  const { command: parsedCommand, ref } = parseInbound(input.body);
+  const command =
+    parsedCommand === "confirm" ? "confirmed" : parsedCommand === "cancel" ? "cancelled" : null;
 
   await logMessageEvent({
     direction: "inbound",
     recipientPhone: input.from,
     body: input.body,
-    status: command ?? "unhandled",
+    status: command ? `${command}${ref ? ` ${ref}` : ""}` : "unhandled",
     rawPayload: input.rawPayload,
   });
 
@@ -283,29 +321,36 @@ export async function handleInboundWhatsAppReply(input: {
   if (business) {
     const ownerLang = (business.booking_page_language as BookingLanguage) ?? "Both";
     const wanted = command === "confirmed" ? "('pending')" : "('pending','confirmed')";
-    const rows = await d1All<InboundBookingRow>(
-      db
-        .prepare(
-          `${BOOKING_SELECT}
-           WHERE b.business_id = ? AND b.status IN ${wanted} AND b.created_at >= ?
-           ORDER BY b.created_at DESC LIMIT 1`,
+    // Owner may target a specific booking by ref; otherwise the most recent.
+    const rows = ref
+      ? await d1All<InboundBookingRow>(
+          db
+            .prepare(
+              `${BOOKING_SELECT}
+               WHERE b.business_id = ? AND b.booking_ref = ? AND b.status IN ${wanted}
+               LIMIT 1`,
+            )
+            .bind(business.id, ref),
         )
-        .bind(business.id, since),
-    );
+      : await d1All<InboundBookingRow>(
+          db
+            .prepare(
+              `${BOOKING_SELECT}
+               WHERE b.business_id = ? AND b.status IN ${wanted} AND b.created_at >= ?
+               ORDER BY b.created_at DESC LIMIT 1`,
+            )
+            .bind(business.id, since),
+        );
     const booking = rows[0];
     if (!booking) {
       return {
         updated: false,
         reason: "owner_no_booking",
-        reply: renderReplyAck("owner_none", ownerLang),
+        reply: ref ? renderRefNotFound(ownerLang) : renderReplyAck("owner_none", ownerLang),
       };
     }
 
-    await d1Run(
-      db
-        .prepare("UPDATE bookings SET status = ?, updated_at = datetime('now') WHERE id = ?")
-        .bind(command, booking.id),
-    );
+    await applyStatus(booking.id, command);
 
     // Tell the customer what the business decided.
     const context = bookingContext(booking);
@@ -337,41 +382,70 @@ export async function handleInboundWhatsAppReply(input: {
     };
   }
 
-  // ── Customer path: act only when the phone has exactly one active booking ─
+  // ── Customer path ────────────────────────────────────────────────────────
+  // With a ref: act on exactly that booking (and only if it's this number's).
+  if (ref) {
+    const rows = await d1All<InboundBookingRow>(
+      db
+        .prepare(
+          `${BOOKING_SELECT}
+           WHERE b.booking_ref = ? AND b.customer_phone = ? AND b.status != 'cancelled'
+           LIMIT 1`,
+        )
+        .bind(ref, phone),
+    );
+    const booking = rows[0];
+    if (!booking) {
+      return { updated: false, reason: "ref_not_found", reply: renderRefNotFound("Both") };
+    }
+    return finishCustomerMutation(booking, command);
+  }
+
+  // No ref: find active bookings for this number.
   const rows = await d1All<InboundBookingRow>(
     db
       .prepare(
         `${BOOKING_SELECT}
          WHERE b.customer_phone = ? AND b.status != 'cancelled' AND b.created_at >= ?
-         ORDER BY b.created_at DESC LIMIT 2`,
+         ORDER BY b.start_at ASC LIMIT 10`,
       )
       .bind(phone, since),
   );
 
-  if (rows.length !== 1) {
+  if (rows.length === 0) {
+    return { updated: false, reason: "not_found", reply: null };
+  }
+
+  // Multiple active bookings + cancel without a ref → never guess; ask which.
+  if (rows.length > 1 && command === "cancelled") {
+    const lang = (rows[0].customer_language as BookingLanguage) ?? "Both";
     return {
       updated: false,
-      reason: rows.length > 1 ? "ambiguous" : "not_found",
-      reply:
-        rows.length > 1
-          ? renderReplyAck(
-              "customer_ambiguous",
-              (rows[0].customer_language as BookingLanguage) ?? "Both",
-            )
-          : null,
+      reason: "ambiguous",
+      reply: renderChooseRefToCancel(
+        lang,
+        rows.map((r) => ({
+          ref: r.booking_ref ?? "RDV-?",
+          serviceName: r.service_name ?? "your service",
+          dateLabel: formatDateLabel(r.start_at, { year: "numeric" }),
+          timeLabel: formatTimeLabel(r.start_at),
+        })),
+      ),
     };
   }
 
-  const booking = rows[0];
-  await d1Run(
-    db
-      .prepare("UPDATE bookings SET status = ?, updated_at = datetime('now') WHERE id = ?")
-      .bind(command, booking.id),
-  );
+  // Exactly one active booking (or a confirm, which targets the soonest).
+  return finishCustomerMutation(rows[0], command);
+}
 
+/** Apply a customer-initiated status change + send the right acks. */
+async function finishCustomerMutation(
+  booking: InboundBookingRow,
+  command: "confirmed" | "cancelled",
+): Promise<InboundResult> {
+  await applyStatus(booking.id, command);
   const context = bookingContext(booking);
 
-  // Alert the owner when a customer cancels.
   if (command === "cancelled" && booking.business_whatsapp) {
     await sendWhatsApp({
       businessId: booking.business_id,

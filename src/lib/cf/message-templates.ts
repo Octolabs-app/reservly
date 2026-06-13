@@ -9,6 +9,7 @@ export type BookingMessageContext = {
   timeLabel: string;
   bookingUrl?: string | null;
   priceLabel?: string | null;
+  bookingRef?: string | null;
   language?: BookingLanguage;
 };
 
@@ -27,19 +28,22 @@ function languageMode(language: BookingLanguage | undefined) {
 }
 
 export function renderBookingConfirmation(input: BookingMessageContext) {
+  const ref = input.bookingRef ?? null;
   const en = line(
     `Hi ${firstName(input.customerName)}, your booking at ${input.businessName} is received:`,
     `${input.serviceName} on ${input.dateLabel} at ${input.timeLabel}.`,
     input.priceLabel ? `Price: ${input.priceLabel}.` : null,
+    ref ? `Ref: ${ref}.` : null,
     input.bookingUrl ? `Details: ${input.bookingUrl}` : null,
-    "Reply CANCEL if you need to cancel.",
+    ref ? `To cancel, reply: /cancel ${ref}` : "Reply CANCEL if you need to cancel.",
   );
   const fr = line(
     `Bonjour ${firstName(input.customerName)}, votre reservation chez ${input.businessName} est recue:`,
     `${input.serviceName}, le ${input.dateLabel} a ${input.timeLabel}.`,
     input.priceLabel ? `Prix: ${input.priceLabel}.` : null,
+    ref ? `Ref: ${ref}.` : null,
     input.bookingUrl ? `Details: ${input.bookingUrl}` : null,
-    "Repondez CANCEL pour annuler.",
+    ref ? `Pour annuler, repondez: /cancel ${ref}` : "Repondez CANCEL pour annuler.",
   );
 
   const mode = languageMode(input.language);
@@ -134,6 +138,33 @@ export function renderReplyAck(
   const mode = languageMode(language);
   const en = ACKS[key].en(context);
   const fr = ACKS[key].fr(context);
+  if (mode === "both") return `${en}\n\n${fr}`;
+  return mode === "fr" ? fr : en;
+}
+
+/** Ambiguous /cancel: list the customer's active bookings and ask for a ref. */
+export function renderChooseRefToCancel(
+  language: BookingLanguage | undefined,
+  items: Array<{ ref: string; serviceName: string; dateLabel: string; timeLabel: string }>,
+) {
+  const list = items
+    .map((i) => `• ${i.ref} — ${i.serviceName}, ${i.dateLabel} ${i.timeLabel}`)
+    .join("\n");
+  const example = items[0]?.ref ?? "RDV-XXXX";
+  const en = `You have ${items.length} upcoming bookings. Reply with the one to cancel, e.g.\n/cancel ${example}\n\n${list}`;
+  const fr = `Vous avez ${items.length} reservations a venir. Repondez avec celle a annuler, ex:\n/cancel ${example}\n\n${list}`;
+  const mode = languageMode(language);
+  if (mode === "both") return `${en}\n\n———\n${fr}`;
+  return mode === "fr" ? fr : en;
+}
+
+/** /cancel REF where the ref doesn't match an active booking for this number. */
+export function renderRefNotFound(language: BookingLanguage | undefined) {
+  const en =
+    "We couldn't find an active booking with that reference for your number. Check the reference in your confirmation message and try again.";
+  const fr =
+    "Aucune reservation active avec cette reference pour votre numero. Verifiez la reference dans votre message de confirmation et reessayez.";
+  const mode = languageMode(language);
   if (mode === "both") return `${en}\n\n${fr}`;
   return mode === "fr" ? fr : en;
 }

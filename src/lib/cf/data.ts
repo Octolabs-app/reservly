@@ -43,8 +43,10 @@ import {
   isoFromMauritiusLocal,
   mauritiusDateFromIso,
   mauritiusMonthBounds,
+  mauritiusTodayInput,
 } from "@/lib/randevou/slots";
 import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
+import { generateBookingRef } from "@/lib/randevou/ref";
 import {
   DEFAULT_MAX_ADVANCE_DAYS,
   DEFAULT_MIN_NOTICE_MINUTES,
@@ -83,6 +85,7 @@ type BusinessRow = {
   min_notice_minutes: number | null;
   max_advance_days: number | null;
   slot_interval_minutes: number | null;
+  no_same_day: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -129,7 +132,7 @@ function clampBookingRules(input: Partial<BusinessInput>) {
     );
   }
   if ("slotIntervalMinutes" in input) {
-    out.slotIntervalMinutes = [15, 30, 60].includes(input.slotIntervalMinutes as number)
+    out.slotIntervalMinutes = [10, 15, 20, 30, 45, 60].includes(input.slotIntervalMinutes as number)
       ? (input.slotIntervalMinutes as number)
       : null;
   }
@@ -171,6 +174,7 @@ type BookingRow = {
   end_at: string;
   status: string;
   source: string;
+  booking_ref: string | null;
   notes: string | null;
   cancellation_reason: string | null;
   created_at: string;
@@ -205,6 +209,7 @@ function mapBusiness(row: BusinessRow): Business {
     minNoticeMinutes: row.min_notice_minutes ?? DEFAULT_MIN_NOTICE_MINUTES,
     maxAdvanceDays: row.max_advance_days ?? DEFAULT_MAX_ADVANCE_DAYS,
     slotIntervalMinutes: row.slot_interval_minutes ?? null,
+    noSameDay: Boolean(row.no_same_day),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -247,6 +252,7 @@ function mapBooking(row: BookingRow): Booking {
     endAt: row.end_at,
     status: (row.status as Booking["status"]) ?? "pending",
     source: (row.source as Booking["source"]) ?? "public",
+    bookingRef: row.booking_ref ?? null,
     notes: row.notes,
     createdAt: row.created_at,
     serviceName: row.service_name,
@@ -283,8 +289,8 @@ export async function createBusiness(
       INSERT INTO businesses
         (id, owner_id, name, slug, category, city, whatsapp_number,
          booking_page_language, timezone, plan, booking_limit_monthly,
-         min_notice_minutes, max_advance_days, slot_interval_minutes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Indian/Mauritius', 'free', ?, ?, ?, ?)
+         min_notice_minutes, max_advance_days, slot_interval_minutes, no_same_day)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Indian/Mauritius', 'free', ?, ?, ?, ?, ?)
     `,
       )
       .bind(
@@ -300,6 +306,7 @@ export async function createBusiness(
         clampBookingRules(input).minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
         clampBookingRules(input).maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
         clampBookingRules(input).slotIntervalMinutes ?? null,
+        input.noSameDay ? 1 : 0,
       ),
   );
 
@@ -383,6 +390,7 @@ export async function updateBusiness(
         min_notice_minutes = COALESCE(?, min_notice_minutes),
         max_advance_days = COALESCE(?, max_advance_days),
         slot_interval_minutes = CASE WHEN ? = 1 THEN ? ELSE slot_interval_minutes END,
+        no_same_day = COALESCE(?, no_same_day),
         updated_at = datetime('now')
       WHERE id = ? AND owner_id = ?
     `,
@@ -397,6 +405,7 @@ export async function updateBusiness(
         clampBookingRules(input).maxAdvanceDays ?? null,
         "slotIntervalMinutes" in input ? 1 : 0,
         clampBookingRules(input).slotIntervalMinutes ?? null,
+        input.noSameDay != null ? (input.noSameDay ? 1 : 0) : null,
         input.id,
         currentOwnerId,
       ),
@@ -566,6 +575,7 @@ export async function getAvailableSlots(
       monthlyFull: devPublic.usage.full,
       stepMinutes: devPublic.business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
       minNoticeMinutes: devPublic.business.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+      noSameDay: devPublic.business.noSameDay,
     });
   }
 
@@ -611,7 +621,63 @@ export async function getAvailableSlots(
     monthlyFull,
     stepMinutes: business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
     minNoticeMinutes: business.minNoticeMinutes,
+    noSameDay: business.noSameDay,
   });
+}
+
+/**
+ * Re-generate the available slots for a booking's business+service+date and
+ * confirm the requested startAt is one of the AVAILABLE ones. This is the
+ * server-side guard: never trust a client-posted date/time. Returns true if
+ * the slot is currently bookable.
+ */
+async function isValidAvailableSlot(
+  db: D1Database,
+  business: Business,
+  service: Service,
+  startAt: string,
+): Promise<boolean> {
+  const date = mauritiusDateFromIso(startAt);
+  const [availRows, bookingRows] = await Promise.all([
+    d1All<AvailabilityRow>(
+      db.prepare("SELECT * FROM availability WHERE business_id = ?").bind(business.id),
+    ),
+    d1All<BookingRow>(
+      db
+        .prepare("SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')")
+        .bind(business.id),
+    ),
+  ]);
+  const monthlyFull = calculateMonthlyUsage(
+    bookingRows.map(mapBooking),
+    business.plan,
+    business.bookingLimitMonthly,
+    new Date(isoFromMauritiusLocal(date, "12:00")),
+  ).full;
+  const slots = generateSlots({
+    date,
+    service,
+    availability: availRows.map(mapAvailability),
+    bookings: bookingRows.map(mapBooking),
+    monthlyFull,
+    stepMinutes: business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+    minNoticeMinutes: business.minNoticeMinutes,
+    noSameDay: business.noSameDay,
+  });
+  return slots.some((slot) => slot.available && slot.startAt === startAt);
+}
+
+/** Generate a booking reference (e.g. RDV-8K2Q) that isn't already in use. */
+async function generateUniqueBookingRef(db: D1Database): Promise<string> {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const ref = generateBookingRef();
+    const existing = await d1First<{ id: string }>(
+      db.prepare("SELECT id FROM bookings WHERE booking_ref = ?").bind(ref),
+    );
+    if (!existing) return ref;
+  }
+  // Astronomically unlikely; fall back to a longer unique-ish suffix.
+  return `${generateBookingRef()}${Math.floor(Math.random() * 90 + 10)}`;
 }
 
 function validateBookingInput(input: BookingInput, options: { phoneRequired: boolean }) {
@@ -691,6 +757,15 @@ export async function createBooking(
           `Bookings can only be made up to ${business.maxAdvanceDays} days in advance.`,
         );
       }
+      if (business.noSameDay && mauritiusDateFromIso(input.startAt) === mauritiusTodayInput()) {
+        throw new Error("Same-day booking is not available. Please pick a later date.");
+      }
+      // Authoritative check: the posted start time must be a real, currently
+      // AVAILABLE generated slot — never trust the client's date/time choice.
+      const validSlot = await isValidAvailableSlot(db, business, service, input.startAt);
+      if (!validSlot) {
+        throw new Error("That time isn't available. Please pick another slot.");
+      }
     }
 
     if (business.plan === "free" && business.bookingLimitMonthly) {
@@ -742,14 +817,15 @@ export async function createBooking(
   if (overlap) throw new Error("That time has just been taken. Pick another slot.");
 
   const id = crypto.randomUUID();
+  const bookingRef = await generateUniqueBookingRef(db);
   await d1Run(
     db
       .prepare(
         `
       INSERT INTO bookings
         (id, business_id, service_id, customer_name, customer_phone,
-         customer_language, start_at, end_at, status, source, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
+         customer_language, start_at, end_at, status, source, booking_ref, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `,
       )
       .bind(
@@ -762,6 +838,7 @@ export async function createBooking(
         input.startAt,
         endAt,
         source,
+        bookingRef,
         input.notes ?? null,
       ),
   );
@@ -781,6 +858,7 @@ export async function createBooking(
     endAt,
     status: "pending",
     source,
+    bookingRef,
     notes: input.notes,
     createdAt: new Date().toISOString(),
   };
@@ -792,6 +870,7 @@ export async function createBooking(
       businessName: business.name,
       serviceName: service.name,
       priceLabel: service.priceLabel,
+      bookingRef,
       dateLabel: formatDateLabel(input.startAt, { year: "numeric" }),
       timeLabel: formatTimeLabel(input.startAt),
       bookingUrl: `${siteUrlFromEnv()}/b/${business.slug}/confirmed?bookingId=${booking.id}`,
