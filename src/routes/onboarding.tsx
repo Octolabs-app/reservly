@@ -191,8 +191,8 @@ function OnboardingPage() {
             </div>
             <div className="p-6">
               <p className="text-sm leading-relaxed text-muted-foreground">
-                Create a free account (or sign in) so Randevou can save your business, services, hours
-                and booking link.
+                Create a free account (or sign in) so Randevou can save your business, services,
+                hours and booking link.
               </p>
               <a href="/auth?redirectTo=/onboarding" className="btn-solid mt-5 w-full py-3">
                 Sign in or create account →

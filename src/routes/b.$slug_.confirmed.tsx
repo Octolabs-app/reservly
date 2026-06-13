@@ -55,6 +55,7 @@ function ConfirmedPage() {
       ]
     : [];
   if (booking?.servicePriceLabel) rows.push([t("rowPrice", lang), booking.servicePriceLabel]);
+  if (booking?.bookingRef) rows.push([t("rowRef", lang), booking.bookingRef]);
 
   return (
     <>

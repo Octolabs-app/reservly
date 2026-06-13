@@ -644,7 +644,9 @@ async function isValidAvailableSlot(
     ),
     d1All<BookingRow>(
       db
-        .prepare("SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')")
+        .prepare(
+          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')",
+        )
         .bind(business.id),
     ),
   ]);

@@ -84,6 +84,7 @@ const STRINGS = {
   rowDate: { en: "Date", fr: "Date" },
   rowTime: { en: "Time", fr: "Heure" },
   rowPrice: { en: "Price", fr: "Prix" },
+  rowRef: { en: "Reference", fr: "Référence" },
   waSent: { en: "Confirmation sent on WhatsApp", fr: "Confirmation envoyée sur WhatsApp" },
   reminderNote: {
     en: "Keep an eye on WhatsApp — the business will confirm your booking there. Reply CANCEL if you need to cancel.",

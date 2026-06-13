@@ -140,11 +140,16 @@ export async function getAdminOverview() {
     d1All<{ plan: string; n: number }>(
       db.prepare("SELECT plan, COUNT(*) n FROM businesses GROUP BY plan"),
     ),
-    d1All<{ id: string; recipient_phone: string | null; status: string; body: string; created_at: string }>(
-      db
-        .prepare(
-          "SELECT id, recipient_phone, status, body, created_at FROM message_events WHERE status LIKE 'failed%' ORDER BY created_at DESC LIMIT 10",
-        ),
+    d1All<{
+      id: string;
+      recipient_phone: string | null;
+      status: string;
+      body: string;
+      created_at: string;
+    }>(
+      db.prepare(
+        "SELECT id, recipient_phone, status, body, created_at FROM message_events WHERE status LIKE 'failed%' ORDER BY created_at DESC LIMIT 10",
+      ),
     ),
     d1All<{
       id: string;
@@ -161,7 +166,9 @@ export async function getAdminOverview() {
       ),
     ),
     d1All<{ id: string; name: string; slug: string; plan: string; created_at: string }>(
-      db.prepare("SELECT id, name, slug, plan, created_at FROM businesses ORDER BY created_at DESC LIMIT 10"),
+      db.prepare(
+        "SELECT id, name, slug, plan, created_at FROM businesses ORDER BY created_at DESC LIMIT 10",
+      ),
     ),
   ]);
 

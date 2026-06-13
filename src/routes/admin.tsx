@@ -40,6 +40,74 @@ async function api(path: string, init?: RequestInit) {
   return payload;
 }
 
+// ─── Payload shapes (loose, read-only views) ───────────────────────────────
+type MsgRow = {
+  id: string;
+  created_at: string;
+  recipient_phone: string;
+  status: string;
+  body: string;
+  direction?: string;
+  business_name?: string | null;
+};
+type BookingRow = {
+  id: string;
+  booking_ref: string | null;
+  customer_name: string;
+  customer_phone?: string;
+  business_name: string | null;
+  status: string;
+  start_at: string;
+  service_name?: string | null;
+};
+type BizRow = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  owner_email?: string | null;
+  booking_limit_monthly?: number | null;
+  booking_count?: number;
+};
+type OwnerRow = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  business_count: number;
+  created_at: string;
+};
+type AuditRow = {
+  id: string;
+  created_at: string;
+  admin_email: string | null;
+  admin_owner_id: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  metadata_json: string | null;
+};
+type OverviewData = {
+  devMode?: boolean;
+  totals: { owners: number; businesses: number; bookings: number };
+  bookingsToday: number;
+  bookingsThisMonth: number;
+  planCounts: Record<string, number>;
+  recentFailedMessages: MsgRow[];
+  recentBookings: BookingRow[];
+  recentBusinesses: BizRow[];
+};
+type SystemData = {
+  twilioConfigured: boolean;
+  paddleConfigured: boolean;
+  dodoConfigured: boolean;
+  paypalManualConfigured: boolean;
+  stripeConfigured: boolean;
+  d1Available: boolean;
+  kvAvailable: boolean;
+  siteUrl: string | null;
+  adminCount: number;
+};
+
 function AdminPage() {
   const [authState, setAuthState] = useState<"checking" | "ok" | "denied">("checking");
   const [tab, setTab] = useState<Tab>("overview");
@@ -89,7 +157,9 @@ function AdminPage() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`shrink-0 rounded-lg px-3 py-1.5 text-xs transition-colors ${
-                tab === t.id ? "bg-white/15 font-medium text-white" : "text-white/50 hover:text-white"
+                tab === t.id
+                  ? "bg-white/15 font-medium text-white"
+                  : "text-white/50 hover:text-white"
               }`}
             >
               {t.label}
@@ -161,7 +231,7 @@ const TD = ({ children }: { children: React.ReactNode }) => (
 
 /* ─── Overview ───────────────────────────────────────────────────────────── */
 function OverviewTab() {
-  const { data } = useEndpoint<any>("/api/admin/overview");
+  const { data } = useEndpoint<OverviewData>("/api/admin/overview");
   if (!data) return <Loading />;
   if (data.devMode) return <DevNote />;
   return (
@@ -194,7 +264,7 @@ function OverviewTab() {
               </tr>
             </thead>
             <tbody>
-              {data.recentFailedMessages.map((m: any) => (
+              {data.recentFailedMessages.map((m) => (
                 <tr key={m.id}>
                   <TD>{new Date(m.created_at + "Z").toLocaleString("en-GB")}</TD>
                   <TD>{m.recipient_phone}</TD>
@@ -222,7 +292,7 @@ function OverviewTab() {
               </tr>
             </thead>
             <tbody>
-              {data.recentBookings.map((b: any) => (
+              {data.recentBookings.map((b) => (
                 <tr key={b.id}>
                   <TD>{b.booking_ref ?? "—"}</TD>
                   <TD>{b.customer_name}</TD>
@@ -244,7 +314,7 @@ function OverviewTab() {
               </tr>
             </thead>
             <tbody>
-              {data.recentBusinesses.map((b: any) => (
+              {data.recentBusinesses.map((b) => (
                 <tr key={b.id}>
                   <TD>{b.name}</TD>
                   <TD>{b.slug}</TD>
@@ -262,7 +332,7 @@ function OverviewTab() {
 /* ─── Businesses ─────────────────────────────────────────────────────────── */
 function BusinessesTab() {
   const [q, setQ] = useState("");
-  const { data, reload } = useEndpoint<{ businesses: any[] }>(
+  const { data, reload } = useEndpoint<{ businesses: BizRow[] }>(
     `/api/admin/businesses?q=${encodeURIComponent(q)}`,
   );
 
@@ -380,7 +450,9 @@ function BusinessesTab() {
 /* ─── Owners ─────────────────────────────────────────────────────────────── */
 function OwnersTab() {
   const [q, setQ] = useState("");
-  const { data } = useEndpoint<{ owners: any[] }>(`/api/admin/owners?q=${encodeURIComponent(q)}`);
+  const { data } = useEndpoint<{ owners: OwnerRow[] }>(
+    `/api/admin/owners?q=${encodeURIComponent(q)}`,
+  );
   return (
     <div className="space-y-3">
       <input
@@ -421,7 +493,7 @@ function OwnersTab() {
 function BookingsTab() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState("all");
-  const { data, reload } = useEndpoint<{ bookings: any[] }>(
+  const { data, reload } = useEndpoint<{ bookings: BookingRow[] }>(
     `/api/admin/bookings?q=${encodeURIComponent(q)}&status=${status}`,
   );
   async function act(bookingId: string, action: "confirm" | "cancel") {
@@ -513,7 +585,7 @@ function BookingsTab() {
 
 /* ─── Billing ────────────────────────────────────────────────────────────── */
 function BillingTab() {
-  const { data } = useEndpoint<any>("/api/admin/system");
+  const { data } = useEndpoint<SystemData>("/api/admin/system");
   if (!data) return <Loading />;
   const rows: [string, boolean][] = [
     ["Paddle (individual)", data.paddleConfigured],
@@ -532,7 +604,10 @@ function BillingTab() {
         </p>
         <ul className="space-y-1.5 text-[13px]">
           {rows.map(([label, ok]) => (
-            <li key={label} className="flex items-center justify-between border-b border-border/60 pb-1.5">
+            <li
+              key={label}
+              className="flex items-center justify-between border-b border-border/60 pb-1.5"
+            >
               <span>{label}</span>
               <Badge ok={ok} />
             </li>
@@ -550,7 +625,7 @@ function BillingTab() {
 
 /* ─── Messaging ──────────────────────────────────────────────────────────── */
 function MessagingTab() {
-  const { data } = useEndpoint<{ events: any[] }>("/api/admin/messaging");
+  const { data } = useEndpoint<{ events: MsgRow[] }>("/api/admin/messaging");
   if (!data) return <Loading />;
   return (
     <TableWrap>
@@ -586,7 +661,7 @@ function MessagingTab() {
 
 /* ─── System ─────────────────────────────────────────────────────────────── */
 function SystemTab() {
-  const { data } = useEndpoint<any>("/api/admin/system");
+  const { data } = useEndpoint<SystemData>("/api/admin/system");
   if (!data) return <Loading />;
   const rows: [string, boolean][] = [
     ["Twilio (WhatsApp) configured", data.twilioConfigured],
@@ -603,7 +678,10 @@ function SystemTab() {
         <SectionTitle>Configuration health</SectionTitle>
         <ul className="space-y-1.5 text-[13px]">
           {rows.map(([label, ok]) => (
-            <li key={label} className="flex items-center justify-between border-b border-border/60 pb-1.5">
+            <li
+              key={label}
+              className="flex items-center justify-between border-b border-border/60 pb-1.5"
+            >
               <span>{label}</span>
               <Badge ok={ok} />
             </li>
@@ -623,10 +701,12 @@ function SystemTab() {
 
 /* ─── Audit ──────────────────────────────────────────────────────────────── */
 function AuditTab() {
-  const { data } = useEndpoint<{ events: any[] }>("/api/admin/audit");
+  const { data } = useEndpoint<{ events: AuditRow[] }>("/api/admin/audit");
   if (!data) return <Loading />;
   if (data.events.length === 0)
-    return <Card className="text-[13px] text-muted-foreground">No admin actions recorded yet.</Card>;
+    return (
+      <Card className="text-[13px] text-muted-foreground">No admin actions recorded yet.</Card>
+    );
   return (
     <TableWrap>
       <thead>

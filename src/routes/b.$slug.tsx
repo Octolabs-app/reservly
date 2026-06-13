@@ -78,7 +78,10 @@ function BookingPage() {
   const langSetting = data?.business.bookingPageLanguage;
   // Honor the owner's max-advance setting (no hardcoded 30-day cap); only a
   // sane ceiling so the date strip can't render an unbounded number of days.
-  const maxDays = Math.max(1, Math.min(data?.business.maxAdvanceDays ?? 14, MAX_ADVANCE_DAYS_CEILING));
+  const maxDays = Math.max(
+    1,
+    Math.min(data?.business.maxAdvanceDays ?? 14, MAX_ADVANCE_DAYS_CEILING),
+  );
   const dates = useMemo(() => {
     const today = mauritiusTodayInput();
     return Array.from({ length: maxDays }, (_, index) =>

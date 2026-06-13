@@ -49,6 +49,8 @@ const ADVANCE_OPTIONS = [
 const INTERVAL_OPTIONS = [
   { value: "", label: "Every 30 minutes (default)" },
   { value: "15", label: "Every 15 minutes" },
+  { value: "20", label: "Every 20 minutes" },
+  { value: "45", label: "Every 45 minutes" },
   { value: "60", label: "Every hour" },
 ];
 
@@ -142,6 +144,7 @@ function SettingsTab() {
         minNoticeMinutes: business.minNoticeMinutes,
         maxAdvanceDays: business.maxAdvanceDays,
         slotIntervalMinutes: business.slotIntervalMinutes,
+        noSameDay: business.noSameDay,
       });
       notify("✓ Booking rules saved");
       await refresh();
@@ -225,29 +228,16 @@ function SettingsTab() {
     }
   }
 
-  async function startCheckout(plan: Extract<Plan, "pro" | "studio">) {
-    if (!business) return;
+  // Online (automated) billing is not live yet. Until a provider (Paddle /
+  // Dodo, as an individual/sole-trader) is approved, upgrades are arranged
+  // manually — we never pretend a card checkout exists.
+  function requestUpgrade(plan: Extract<Plan, "pro" | "studio">) {
     setCheckoutPlan(plan);
-    setMessage(null);
-    try {
-      const response = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ businessId: business.id, plan }),
-      });
-      const result = (await response.json()) as { url?: string | null; message?: string };
-      if (!response.ok) throw new Error(result.message ?? "Checkout could not start.");
-      if (result.url) {
-        window.location.href = result.url;
-        return;
-      }
-      notify("Online upgrades are almost ready. Contact Octolabs to enable Pro or Studio.", "info");
-    } catch (error) {
-      failMessage(error, "Checkout could not start.");
-    } finally {
-      setCheckoutPlan(null);
-    }
+    notify(
+      `To move to the ${plan === "pro" ? "Pro" : "Studio"} plan, email hello@octolabs.app — online card billing is being set up and we'll activate your plan manually in the meantime.`,
+      "info",
+    );
+    setCheckoutPlan(null);
   }
 
   async function signOut() {
@@ -335,17 +325,17 @@ function SettingsTab() {
             <div className="flex gap-2">
               <button
                 disabled={checkoutPlan !== null}
-                onClick={() => void startCheckout("pro")}
+                onClick={() => requestUpgrade("pro")}
                 className="btn-solid px-3.5 py-2 text-xs"
               >
-                {checkoutPlan === "pro" ? "Opening…" : "Upgrade to Pro — $5/mo"}
+                Upgrade to Pro
               </button>
               <button
                 disabled={checkoutPlan !== null}
-                onClick={() => void startCheckout("studio")}
+                onClick={() => requestUpgrade("studio")}
                 className="btn-frame-primary px-3.5 py-2 text-xs"
               >
-                {checkoutPlan === "studio" ? "Opening…" : "Studio — $12/mo"}
+                Studio
               </button>
             </div>
           )}
@@ -538,6 +528,20 @@ function SettingsTab() {
             </p>
           </div>
         </div>
+        <label className="mt-4 flex items-center gap-2.5 text-[13px] text-foreground">
+          <input
+            type="checkbox"
+            checked={business.noSameDay}
+            onChange={(event) => setBusiness({ ...business, noSameDay: event.target.checked })}
+            className="h-4 w-4 rounded border-border"
+          />
+          <span>
+            No same-day booking
+            <span className="ml-1 text-[11px] text-muted-foreground">
+              — customers must book at least the next day
+            </span>
+          </span>
+        </label>
       </Panel>
 
       {/* Services */}
@@ -620,6 +624,16 @@ function SettingsTab() {
                           services,
                           setServices,
                         );
+                      } else if (value === "custom") {
+                        const entered = prompt("Custom duration in minutes:", "75");
+                        const mins = Math.max(5, Math.min(1440, Number(entered) || 0));
+                        if (mins)
+                          replaceService(
+                            index,
+                            { ...service, allDay: false, durationMinutes: mins },
+                            services,
+                            setServices,
+                          );
                       } else {
                         replaceService(
                           index,
@@ -643,6 +657,7 @@ function SettingsTab() {
                         {service.durationMinutes} min (custom)
                       </option>
                     )}
+                    <option value="custom">Custom…</option>
                     <option value="all-day">Full day</option>
                   </select>
                 </div>

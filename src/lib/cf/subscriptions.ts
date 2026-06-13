@@ -94,9 +94,7 @@ export function isAutomatedBillingLive(): boolean {
   return cfg.paddle || cfg.dodo;
 }
 
-export async function getSubscriptionForBusiness(
-  businessId: string,
-): Promise<Subscription | null> {
+export async function getSubscriptionForBusiness(businessId: string): Promise<Subscription | null> {
   const db = getD1();
   if (!db) return null;
   const row = await d1First<SubscriptionRow>(
