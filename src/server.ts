@@ -40,13 +40,11 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    // Inject Cloudflare bindings (D1, KV, secrets) before any handler runs.
-    // On local Vite dev, env will be undefined/empty — initCFBindings is a no-op
-    // and the app falls back to the in-browser dev-store automatically.
-    // TEMP diagnostic: record what the entry actually receives as `env`.
-    (globalThis as Record<string, unknown>).__cfFetchEnvType = typeof env;
-    (globalThis as Record<string, unknown>).__cfFetchEnvKeys =
-      env && typeof env === "object" ? Object.keys(env as object) : null;
+    // Inject Cloudflare bindings if the runtime passes them as the entry's env
+    // argument. In the current Nitro cloudflare_pages stack this arrives
+    // undefined, so the bindings are actually resolved from the
+    // `cloudflare:workers` module inside src/lib/cf/db.ts. This call is kept as a
+    // harmless belt-and-suspenders for runtimes that do pass env here.
     if (env && typeof env === "object") {
       initCFBindings(env as CloudflareEnv);
     }

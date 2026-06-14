@@ -20,7 +20,6 @@ import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardBookingsRouteImport } from './routes/dashboard.bookings'
 import { Route as BSlugRouteImport } from './routes/b.$slug'
-import { Route as ApiDebugEnvRouteImport } from './routes/api.debug-env'
 import { Route as ApiAuthRouteImport } from './routes/api.auth'
 import { Route as BSlugConfirmedRouteImport } from './routes/b.$slug_.confirmed'
 import { Route as ApiTwilioInboundRouteImport } from './routes/api.twilio.inbound'
@@ -102,11 +101,6 @@ const DashboardBookingsRoute = DashboardBookingsRouteImport.update({
 const BSlugRoute = BSlugRouteImport.update({
   id: '/b/$slug',
   path: '/b/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiDebugEnvRoute = ApiDebugEnvRouteImport.update({
-  id: '/api/debug-env',
-  path: '/api/debug-env',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthRoute = ApiAuthRouteImport.update({
@@ -257,7 +251,6 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/api/auth': typeof ApiAuthRouteWithChildren
-  '/api/debug-env': typeof ApiDebugEnvRoute
   '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -297,7 +290,6 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/api/auth': typeof ApiAuthRouteWithChildren
-  '/api/debug-env': typeof ApiDebugEnvRoute
   '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -339,7 +331,6 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/api/auth': typeof ApiAuthRouteWithChildren
-  '/api/debug-env': typeof ApiDebugEnvRoute
   '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
@@ -382,7 +373,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/api/auth'
-    | '/api/debug-env'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
@@ -422,7 +412,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/api/auth'
-    | '/api/debug-env'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
@@ -463,7 +452,6 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/api/auth'
-    | '/api/debug-env'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
@@ -505,7 +493,6 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   ApiAuthRoute: typeof ApiAuthRouteWithChildren
-  ApiDebugEnvRoute: typeof ApiDebugEnvRoute
   BSlugRoute: typeof BSlugRoute
   ApiAdminAuditRoute: typeof ApiAdminAuditRoute
   ApiAdminBookingsRoute: typeof ApiAdminBookingsRoute
@@ -607,13 +594,6 @@ declare module '@tanstack/react-router' {
       path: '/b/$slug'
       fullPath: '/b/$slug'
       preLoaderRoute: typeof BSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/debug-env': {
-      id: '/api/debug-env'
-      path: '/api/debug-env'
-      fullPath: '/api/debug-env'
-      preLoaderRoute: typeof ApiDebugEnvRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth': {
@@ -852,7 +832,6 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   ApiAuthRoute: ApiAuthRouteWithChildren,
-  ApiDebugEnvRoute: ApiDebugEnvRoute,
   BSlugRoute: BSlugRoute,
   ApiAdminAuditRoute: ApiAdminAuditRoute,
   ApiAdminBookingsRoute: ApiAdminBookingsRoute,

@@ -33,8 +33,15 @@ binding = "KV"
 id = "e4babc1547ca4b7b8f2aaad412801836"
 
 # ─── Environment variables (non-secret) ──────────────────────────────────────
+# NOTE: When a wrangler.toml with `pages_build_output_dir` is present, Cloudflare
+# Pages IGNORES env vars set in the dashboard. So any non-secret runtime var must
+# live here to actually reach the Worker.
 [vars]
 SITE_URL = "https://randevou.octolabs.app"
+# Platform-admin allowlist (comma-separated owner emails). Not a secret — it only
+# gates which signed-in owners can open /admin; access still requires the owner's
+# own password. Kept here because dashboard vars are ignored (see note above).
+ADMIN_EMAILS = "hello@octolabs.app"
 
 # ─── Secrets (set via `wrangler pages secret put <NAME> --project-name=randevou`)
 # Auth / platform:
