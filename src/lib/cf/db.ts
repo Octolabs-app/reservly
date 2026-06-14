@@ -105,6 +105,37 @@ export function initCFBindings(env: CloudflareEnv) {
   _cfEnv = env;
 }
 
+/**
+ * Resolve the Cloudflare bindings directly from the Workers runtime.
+ *
+ * In this Nitro `cloudflare_pages` + h3 v2 stack the bindings are NOT handed to
+ * the server entry's `fetch(request, env, ctx)` (env arrives `undefined`), so we
+ * read them from the `cloudflare:workers` virtual module, which exposes the
+ * isolate-scoped `env` at module scope. The dynamic import only resolves inside
+ * the Workers runtime; in local Vite/Node dev it throws and we silently keep the
+ * in-browser dev-store fallback.
+ */
+async function resolveWorkersEnv(): Promise<void> {
+  if (_cfEnv) return;
+  try {
+    // Non-literal specifier so the bundler does not try to resolve this
+    // Workers-only module at build time (it only exists at runtime on CF).
+    const spec = "cloudflare:" + "workers";
+    const mod = (await import(/* @vite-ignore */ spec)) as {
+      env?: CloudflareEnv;
+    };
+    if (mod?.env && typeof mod.env === "object" && mod.env.DB) {
+      initCFBindings(mod.env);
+    }
+  } catch {
+    // Not running on Cloudflare Workers — keep the dev-store fallback.
+  }
+}
+
+// Resolve once per isolate at module load. Top-level await guarantees the
+// bindings are populated before any handler that imports this module runs.
+await resolveWorkersEnv();
+
 export function getD1(): D1Database | null {
   return _d1;
 }
