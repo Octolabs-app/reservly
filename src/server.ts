@@ -43,6 +43,10 @@ export default {
     // Inject Cloudflare bindings (D1, KV, secrets) before any handler runs.
     // On local Vite dev, env will be undefined/empty — initCFBindings is a no-op
     // and the app falls back to the in-browser dev-store automatically.
+    // TEMP diagnostic: record what the entry actually receives as `env`.
+    (globalThis as Record<string, unknown>).__cfFetchEnvType = typeof env;
+    (globalThis as Record<string, unknown>).__cfFetchEnvKeys =
+      env && typeof env === "object" ? Object.keys(env as object) : null;
     if (env && typeof env === "object") {
       initCFBindings(env as CloudflareEnv);
     }
