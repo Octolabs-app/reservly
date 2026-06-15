@@ -6,6 +6,7 @@ import {
   createService,
   deleteAccount,
   deleteService,
+  disconnectFacebookAccount,
   disconnectGoogleAccount,
   getDashboardData,
   setPassword,
@@ -261,6 +262,16 @@ function SettingsTab() {
       await refresh();
     } catch (err) {
       failMessage(err, "Google account could not be disconnected.");
+    }
+  }
+
+  async function disconnectFacebook() {
+    try {
+      await disconnectFacebookAccount();
+      notify("Facebook account disconnected");
+      await refresh();
+    } catch (err) {
+      failMessage(err, "Facebook account could not be disconnected.");
     }
   }
 
@@ -870,10 +881,10 @@ function SettingsTab() {
 
       {/* Sign-in & security */}
       <Panel className="p-5">
-        <SectionHeader title="Sign-in & security" sub="Google login and password settings." />
+        <SectionHeader title="Sign-in & security" sub="Social login and password settings." />
 
         {/* Google row */}
-        <div className="mb-4 rounded-xl border border-border bg-surface px-4 py-3">
+        <div className="mb-3 rounded-xl border border-border bg-surface px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-[13px] font-bold text-foreground">Google account</div>
@@ -906,6 +917,45 @@ function SettingsTab() {
                 className="btn-frame-primary px-3 py-2 text-xs"
               >
                 Connect Google
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Facebook row */}
+        <div className="mb-3 rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-bold text-foreground">Facebook account</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {data.owner?.facebookLinked
+                  ? `Connected${data.owner.facebookEmail ? ` as ${data.owner.facebookEmail}` : ""}`
+                  : "Use Facebook for faster sign-in without changing billing."}
+              </div>
+            </div>
+            {data.owner?.facebookLinked ? (
+              data.owner.passwordLoginEnabled ? (
+                <button
+                  onClick={() => void disconnectFacebook()}
+                  className="btn-frame px-3 py-2 text-xs"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowSetPw(true)}
+                  className="btn-frame px-3 py-2 text-xs"
+                  title="Set an email/password login first, then you can disconnect Facebook"
+                >
+                  Set password to disconnect
+                </button>
+              )
+            ) : (
+              <a
+                href="/api/auth/facebook/start?mode=link&redirectTo=/dashboard/settings"
+                className="btn-frame-primary px-3 py-2 text-xs"
+              >
+                Connect Facebook
               </a>
             )}
           </div>

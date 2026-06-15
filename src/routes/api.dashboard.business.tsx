@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireApiOwner, jsonError } from "@/lib/cf/api";
+import { requireApiOwner, jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 import { createBusiness, updateBusiness } from "@/lib/cf/data";
 import type { BusinessInput } from "@/lib/randevou/types";
 
@@ -10,6 +10,8 @@ export const Route = createFileRoute("/api/dashboard/business")({
       POST: async ({ request }) => {
         const owner = await requireApiOwner(request);
         if (owner instanceof Response) return owner;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const input = (await request.json()) as BusinessInput;
           return Response.json(await createBusiness(input, owner));
@@ -20,6 +22,8 @@ export const Route = createFileRoute("/api/dashboard/business")({
       PATCH: async ({ request }) => {
         const owner = await requireApiOwner(request);
         if (owner instanceof Response) return owner;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const input = (await request.json()) as Partial<BusinessInput> & { id: string };
           return Response.json(await updateBusiness(input, owner.id));

@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireApiOwner, jsonError, requireSameOriginMutation } from "@/lib/cf/api";
-import { createOwnerBooking } from "@/lib/cf/data";
-import type { BookingInput } from "@/lib/randevou/types";
+import { disconnectGoogleOwner } from "@/lib/cf/auth";
+import { jsonError, requireApiOwner, requireSameOriginMutation } from "@/lib/cf/api";
 
-export const Route = createFileRoute("/api/dashboard/create-booking")({
+export const Route = createFileRoute("/api/auth/google/disconnect")({
   component: Empty,
   server: {
     handlers: {
@@ -13,8 +12,7 @@ export const Route = createFileRoute("/api/dashboard/create-booking")({
         const originError = requireSameOriginMutation(request);
         if (originError) return originError;
         try {
-          const input = (await request.json()) as BookingInput;
-          return Response.json(await createOwnerBooking(input, owner.id));
+          return Response.json({ owner: await disconnectGoogleOwner(owner.id) });
         } catch (error) {
           return jsonError(error);
         }

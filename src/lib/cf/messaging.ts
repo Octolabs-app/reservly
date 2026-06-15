@@ -1,7 +1,6 @@
 // src/lib/cf/messaging.ts
-// WhatsApp messaging layer: Twilio REST API (plain fetch — Workers-safe, no
-// Node SDK) with D1 event logging, inbound reply handling for both customers
-// and owners, and Twilio webhook signature validation.
+// WhatsApp messaging via Meta Cloud API (plain fetch — Workers-safe, no SDK).
+// Inbound webhook handling + HMAC-SHA256 signature validation.
 
 import { getCFEnv, getD1, d1All, d1First, d1Run } from "./db";
 import {
@@ -77,7 +76,7 @@ export async function logMessageEvent(input: {
       INSERT INTO message_events
         (id, business_id, booking_id, direction, channel, provider,
          provider_message_id, recipient_phone, body, status, raw_payload)
-      VALUES (?, ?, ?, ?, 'whatsapp', 'twilio', ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, 'whatsapp', 'meta_cloud', ?, ?, ?, ?, ?)
     `,
       )
       .bind(
@@ -94,17 +93,17 @@ export async function logMessageEvent(input: {
   );
 }
 
-// ─── Twilio send (REST API via fetch) ─────────────────────────────────────────
+// ─── Meta Cloud API send ──────────────────────────────────────────────────────
+// https://developers.facebook.com/docs/whatsapp/cloud-api/messages/text-messages
 
 async function sendWhatsApp(
   input: MessageInput,
-): Promise<{ sid: string | null; loggedOnly: boolean }> {
+): Promise<{ messageId: string | null; loggedOnly: boolean }> {
   const env = getCFEnv();
-  const accountSid = env?.TWILIO_ACCOUNT_SID;
-  const authToken = env?.TWILIO_AUTH_TOKEN;
-  const from = env?.TWILIO_WHATSAPP_FROM;
+  const token = env?.META_WA_TOKEN;
+  const phoneId = env?.META_WA_PHONE_ID;
 
-  if (!accountSid || !authToken || !from) {
+  if (!token || !phoneId) {
     await logMessageEvent({
       businessId: input.businessId,
       bookingId: input.bookingId,
@@ -113,28 +112,35 @@ async function sendWhatsApp(
       body: input.body,
       status: "logged_dev",
     });
-    return { sid: null, loggedOnly: true };
+    return { messageId: null, loggedOnly: true };
   }
 
-  const to = input.to.startsWith("whatsapp:") ? input.to : `whatsapp:${input.to}`;
-  const body = new URLSearchParams({ From: from, To: to, Body: input.body });
+  // Strip any "whatsapp:" prefix — Meta wants a plain E.164 number.
+  const to = input.to.replace(/^whatsapp:/, "");
+
   const response = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
+    `https://graph.facebook.com/v19.0/${phoneId}/messages`,
     {
       method: "POST",
       headers: {
-        Authorization: `Basic ${btoa(`${accountSid}:${authToken}`)}`,
-        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      body,
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: input.body },
+      }),
     },
   );
 
-  const result = (await response.json().catch(() => null)) as {
-    sid?: string;
-    status?: string;
-    message?: string;
-  } | null;
+  type MetaResponse = {
+    messages?: Array<{ id: string }>;
+    error?: { message: string; code: number };
+  };
+  const result = (await response.json().catch(() => null)) as MetaResponse | null;
+  const messageId = result?.messages?.[0]?.id ?? null;
 
   await logMessageEvent({
     businessId: input.businessId,
@@ -143,12 +149,12 @@ async function sendWhatsApp(
     recipientPhone: input.to,
     body: input.body,
     status: response.ok
-      ? (result?.status ?? "queued")
-      : `failed: ${result?.message ?? response.status}`,
-    providerMessageId: result?.sid ?? null,
+      ? "sent"
+      : `failed: ${result?.error?.message ?? response.status}`,
+    providerMessageId: messageId,
   });
 
-  return { sid: result?.sid ?? null, loggedOnly: false };
+  return { messageId, loggedOnly: false };
 }
 
 export async function sendBookingConfirmation(input: MessageInput) {
@@ -183,46 +189,37 @@ export async function sendTemplatedCancellationMessage(
   return sendCancellationMessage({ ...input, body: renderCancellationMessage(input.booking) });
 }
 
-// ─── Twilio webhook signature validation ─────────────────────────────────────
-// https://www.twilio.com/docs/usage/security#validating-requests
-// signature = base64(HMAC-SHA1(authToken, url + concat(sorted param k+v)))
+// ─── Meta webhook signature validation ───────────────────────────────────────
+// X-Hub-Signature-256: sha256=HMAC-SHA256(app_secret, raw_body)
 
-export async function validateTwilioSignature(
-  request: Request,
-  params: Record<string, string>,
+export async function validateMetaWebhookSignature(
+  rawBody: string,
+  signatureHeader: string | null,
 ): Promise<boolean> {
   const env = getCFEnv();
-  const authToken = env?.TWILIO_AUTH_TOKEN;
-  // Without a token there is nothing to validate against (log-only/dev mode).
-  if (!authToken) return true;
+  const appSecret = env?.META_APP_SECRET;
+  if (!appSecret) return true; // dev mode: no secret configured, allow all
 
-  const signature = request.headers.get("x-twilio-signature");
-  if (!signature) return false;
-
-  // Twilio signs the public URL it called. Behind Cloudflare the request.url
-  // host is correct, but prefer SITE_URL origin when configured to survive
-  // any internal rewrites.
-  const requestUrl = new URL(request.url);
-  const origin = env?.SITE_URL ? env.SITE_URL.replace(/\/$/, "") : requestUrl.origin;
-  const url = `${origin}${requestUrl.pathname}${requestUrl.search}`;
-
-  const data =
-    url +
-    Object.keys(params)
-      .sort()
-      .map((key) => key + params[key])
-      .join("");
+  if (!signatureHeader?.startsWith("sha256=")) return false;
+  const expected = signatureHeader.slice("sha256=".length);
 
   const key = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(authToken),
-    { name: "HMAC", hash: "SHA-1" },
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
   );
-  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
-  const expected = btoa(String.fromCharCode(...new Uint8Array(mac)));
-  return expected === signature;
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody));
+  const computed = Array.from(new Uint8Array(mac))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  return computed === expected;
+}
+
+export function metaVerifyToken(): string | undefined {
+  return getCFEnv()?.META_WA_VERIFY_TOKEN;
 }
 
 // ─── Inbound WhatsApp reply handler ──────────────────────────────────────────
@@ -232,8 +229,10 @@ type InboundResult = {
   reason?: string;
   bookingId?: string;
   status?: string;
-  /** Ack text to send back via TwiML; null = no reply. */
+  /** Reply text to send back to the sender; null = no reply. */
   reply: string | null;
+  /** Phone number of the original sender — needed to dispatch the reply. */
+  replyTo?: string | null;
 };
 
 type InboundBookingRow = {
@@ -321,7 +320,6 @@ export async function handleInboundWhatsAppReply(input: {
   if (business) {
     const ownerLang = (business.booking_page_language as BookingLanguage) ?? "Both";
     const wanted = command === "confirmed" ? "('pending')" : "('pending','confirmed')";
-    // Owner may target a specific booking by ref; otherwise the most recent.
     const rows = ref
       ? await d1All<InboundBookingRow>(
           db
@@ -343,16 +341,12 @@ export async function handleInboundWhatsAppReply(input: {
         );
     const booking = rows[0];
     if (!booking) {
-      return {
-        updated: false,
-        reason: "owner_no_booking",
-        reply: ref ? renderRefNotFound(ownerLang) : renderReplyAck("owner_none", ownerLang),
-      };
+      const reply = ref ? renderRefNotFound(ownerLang) : renderReplyAck("owner_none", ownerLang);
+      return { updated: false, reason: "owner_no_booking", reply, replyTo: phone };
     }
 
     await applyStatus(booking.id, command);
 
-    // Tell the customer what the business decided.
     const context = bookingContext(booking);
     if (command === "cancelled") {
       await sendTemplatedCancellationMessage({
@@ -370,20 +364,15 @@ export async function handleInboundWhatsAppReply(input: {
       });
     }
 
-    return {
-      updated: true,
-      bookingId: booking.id,
-      status: command,
-      reply: renderReplyAck(
-        command === "confirmed" ? "owner_confirmed" : "owner_cancelled",
-        ownerLang,
-        context,
-      ),
-    };
+    const reply = renderReplyAck(
+      command === "confirmed" ? "owner_confirmed" : "owner_cancelled",
+      ownerLang,
+      context,
+    );
+    return { updated: true, bookingId: booking.id, status: command, reply, replyTo: phone };
   }
 
   // ── Customer path ────────────────────────────────────────────────────────
-  // With a ref: act on exactly that booking (and only if it's this number's).
   if (ref) {
     const rows = await d1All<InboundBookingRow>(
       db
@@ -396,12 +385,11 @@ export async function handleInboundWhatsAppReply(input: {
     );
     const booking = rows[0];
     if (!booking) {
-      return { updated: false, reason: "ref_not_found", reply: renderRefNotFound("Both") };
+      return { updated: false, reason: "ref_not_found", reply: renderRefNotFound("Both"), replyTo: phone };
     }
-    return finishCustomerMutation(booking, command);
+    return finishCustomerMutation(booking, command, phone);
   }
 
-  // No ref: find active bookings for this number.
   const rows = await d1All<InboundBookingRow>(
     db
       .prepare(
@@ -416,32 +404,27 @@ export async function handleInboundWhatsAppReply(input: {
     return { updated: false, reason: "not_found", reply: null };
   }
 
-  // Multiple active bookings + cancel without a ref → never guess; ask which.
   if (rows.length > 1 && command === "cancelled") {
     const lang = (rows[0].customer_language as BookingLanguage) ?? "Both";
-    return {
-      updated: false,
-      reason: "ambiguous",
-      reply: renderChooseRefToCancel(
-        lang,
-        rows.map((r) => ({
-          ref: r.booking_ref ?? "RDV-?",
-          serviceName: r.service_name ?? "your service",
-          dateLabel: formatDateLabel(r.start_at, { year: "numeric" }),
-          timeLabel: formatTimeLabel(r.start_at),
-        })),
-      ),
-    };
+    const reply = renderChooseRefToCancel(
+      lang,
+      rows.map((r) => ({
+        ref: r.booking_ref ?? "RDV-?",
+        serviceName: r.service_name ?? "your service",
+        dateLabel: formatDateLabel(r.start_at, { year: "numeric" }),
+        timeLabel: formatTimeLabel(r.start_at),
+      })),
+    );
+    return { updated: false, reason: "ambiguous", reply, replyTo: phone };
   }
 
-  // Exactly one active booking (or a confirm, which targets the soonest).
-  return finishCustomerMutation(rows[0], command);
+  return finishCustomerMutation(rows[0], command, phone);
 }
 
-/** Apply a customer-initiated status change + send the right acks. */
 async function finishCustomerMutation(
   booking: InboundBookingRow,
   command: "confirmed" | "cancelled",
+  senderPhone: string,
 ): Promise<InboundResult> {
   await applyStatus(booking.id, command);
   const context = bookingContext(booking);
@@ -459,14 +442,10 @@ async function finishCustomerMutation(
     });
   }
 
-  return {
-    updated: true,
-    bookingId: booking.id,
-    status: command,
-    reply: renderReplyAck(
-      command === "confirmed" ? "customer_confirmed" : "customer_cancelled",
-      context.language ?? "Both",
-      context,
-    ),
-  };
+  const reply = renderReplyAck(
+    command === "confirmed" ? "customer_confirmed" : "customer_cancelled",
+    context.language ?? "Both",
+    context,
+  );
+  return { updated: true, bookingId: booking.id, status: command, reply, replyTo: senderPhone };
 }

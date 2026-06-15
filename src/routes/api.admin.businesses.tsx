@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { jsonError } from "@/lib/cf/api";
+import { jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 import {
   adminUpdateBookingLimit,
   adminUpdateBusinessPlan,
@@ -40,6 +40,8 @@ export const Route = createFileRoute("/api/admin/businesses")({
       POST: async ({ request }) => {
         const admin = await requirePlatformAdmin(request);
         if (admin instanceof Response) return admin;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const body = (await request.json()) as Body;
           if (!body.businessId) return jsonError(new Error("businessId required."));

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createBooking } from "@/lib/cf/data";
-import { jsonError } from "@/lib/cf/api";
+import { jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 import { allowRequest, clientIp } from "@/lib/cf/rate-limit";
 import { normalizeWhatsAppNumber } from "@/lib/randevou/phone";
 import type { BookingInput } from "@/lib/randevou/types";
@@ -10,6 +10,9 @@ export const Route = createFileRoute("/api/public/bookings")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
+
         try {
           const input = (await request.json()) as BookingInput;
 

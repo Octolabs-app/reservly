@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireApiOwner, jsonError } from "@/lib/cf/api";
+import { requireApiOwner, jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 import { updateAvailability } from "@/lib/cf/data";
 import type { AvailabilityInput } from "@/lib/randevou/types";
 
@@ -10,6 +10,8 @@ export const Route = createFileRoute("/api/dashboard/availability")({
       POST: async ({ request }) => {
         const owner = await requireApiOwner(request);
         if (owner instanceof Response) return owner;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const input = (await request.json()) as AvailabilityInput;
           return Response.json(await updateAvailability(input, owner.id));

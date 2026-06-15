@@ -51,6 +51,13 @@ import { Route as ApiAdminMessagingRouteImport } from './routes/api.admin.messag
 import { Route as ApiAdminBusinessesRouteImport } from './routes/api.admin.businesses'
 import { Route as ApiAdminBookingsRouteImport } from './routes/api.admin.bookings'
 import { Route as ApiAdminAuditRouteImport } from './routes/api.admin.audit'
+import { Route as ApiMetaWaWebhookRouteImport } from './routes/api.meta.wa.webhook'
+import { Route as ApiAuthGoogleStartRouteImport } from './routes/api.auth.google.start'
+import { Route as ApiAuthGoogleDisconnectRouteImport } from './routes/api.auth.google.disconnect'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api.auth.google.callback'
+import { Route as ApiAuthFacebookStartRouteImport } from './routes/api.auth.facebook.start'
+import { Route as ApiAuthFacebookDisconnectRouteImport } from './routes/api.auth.facebook.disconnect'
+import { Route as ApiAuthFacebookCallbackRouteImport } from './routes/api.auth.facebook.callback'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -265,6 +272,42 @@ const ApiAdminAuditRoute = ApiAdminAuditRouteImport.update({
   path: '/api/admin/audit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaWaWebhookRoute = ApiMetaWaWebhookRouteImport.update({
+  id: '/api/meta/wa/webhook',
+  path: '/api/meta/wa/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthGoogleStartRoute = ApiAuthGoogleStartRouteImport.update({
+  id: '/google/start',
+  path: '/google/start',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthGoogleDisconnectRoute = ApiAuthGoogleDisconnectRouteImport.update({
+  id: '/google/disconnect',
+  path: '/google/disconnect',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/google/callback',
+  path: '/google/callback',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthFacebookStartRoute = ApiAuthFacebookStartRouteImport.update({
+  id: '/facebook/start',
+  path: '/facebook/start',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthFacebookDisconnectRoute =
+  ApiAuthFacebookDisconnectRouteImport.update({
+    id: '/facebook/disconnect',
+    path: '/facebook/disconnect',
+    getParentRoute: () => ApiAuthRoute,
+  } as any)
+const ApiAuthFacebookCallbackRoute = ApiAuthFacebookCallbackRouteImport.update({
+  id: '/facebook/callback',
+  path: '/facebook/callback',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -309,6 +352,13 @@ export interface FileRoutesByFullPath {
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
   '/b/$slug/confirmed': typeof BSlugConfirmedRoute
+  '/api/auth/facebook/callback': typeof ApiAuthFacebookCallbackRoute
+  '/api/auth/facebook/disconnect': typeof ApiAuthFacebookDisconnectRoute
+  '/api/auth/facebook/start': typeof ApiAuthFacebookStartRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/disconnect': typeof ApiAuthGoogleDisconnectRoute
+  '/api/auth/google/start': typeof ApiAuthGoogleStartRoute
+  '/api/meta/wa/webhook': typeof ApiMetaWaWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -352,6 +402,13 @@ export interface FileRoutesByTo {
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
   '/b/$slug/confirmed': typeof BSlugConfirmedRoute
+  '/api/auth/facebook/callback': typeof ApiAuthFacebookCallbackRoute
+  '/api/auth/facebook/disconnect': typeof ApiAuthFacebookDisconnectRoute
+  '/api/auth/facebook/start': typeof ApiAuthFacebookStartRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/disconnect': typeof ApiAuthGoogleDisconnectRoute
+  '/api/auth/google/start': typeof ApiAuthGoogleStartRoute
+  '/api/meta/wa/webhook': typeof ApiMetaWaWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -397,6 +454,13 @@ export interface FileRoutesById {
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
   '/b/$slug_/confirmed': typeof BSlugConfirmedRoute
+  '/api/auth/facebook/callback': typeof ApiAuthFacebookCallbackRoute
+  '/api/auth/facebook/disconnect': typeof ApiAuthFacebookDisconnectRoute
+  '/api/auth/facebook/start': typeof ApiAuthFacebookStartRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/disconnect': typeof ApiAuthGoogleDisconnectRoute
+  '/api/auth/google/start': typeof ApiAuthGoogleStartRoute
+  '/api/meta/wa/webhook': typeof ApiMetaWaWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -443,6 +507,13 @@ export interface FileRouteTypes {
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
     | '/b/$slug/confirmed'
+    | '/api/auth/facebook/callback'
+    | '/api/auth/facebook/disconnect'
+    | '/api/auth/facebook/start'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/disconnect'
+    | '/api/auth/google/start'
+    | '/api/meta/wa/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -486,6 +557,13 @@ export interface FileRouteTypes {
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
     | '/b/$slug/confirmed'
+    | '/api/auth/facebook/callback'
+    | '/api/auth/facebook/disconnect'
+    | '/api/auth/facebook/start'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/disconnect'
+    | '/api/auth/google/start'
+    | '/api/meta/wa/webhook'
   id:
     | '__root__'
     | '/'
@@ -530,6 +608,13 @@ export interface FileRouteTypes {
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
     | '/b/$slug_/confirmed'
+    | '/api/auth/facebook/callback'
+    | '/api/auth/facebook/disconnect'
+    | '/api/auth/facebook/start'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/disconnect'
+    | '/api/auth/google/start'
+    | '/api/meta/wa/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -566,6 +651,7 @@ export interface RootRouteChildren {
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTwilioInboundRoute: typeof ApiTwilioInboundRoute
   BSlugConfirmedRoute: typeof BSlugConfirmedRoute
+  ApiMetaWaWebhookRoute: typeof ApiMetaWaWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -864,6 +950,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta/wa/webhook': {
+      id: '/api/meta/wa/webhook'
+      path: '/api/meta/wa/webhook'
+      fullPath: '/api/meta/wa/webhook'
+      preLoaderRoute: typeof ApiMetaWaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/google/start': {
+      id: '/api/auth/google/start'
+      path: '/google/start'
+      fullPath: '/api/auth/google/start'
+      preLoaderRoute: typeof ApiAuthGoogleStartRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/google/disconnect': {
+      id: '/api/auth/google/disconnect'
+      path: '/google/disconnect'
+      fullPath: '/api/auth/google/disconnect'
+      preLoaderRoute: typeof ApiAuthGoogleDisconnectRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/google/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/facebook/start': {
+      id: '/api/auth/facebook/start'
+      path: '/facebook/start'
+      fullPath: '/api/auth/facebook/start'
+      preLoaderRoute: typeof ApiAuthFacebookStartRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/facebook/disconnect': {
+      id: '/api/auth/facebook/disconnect'
+      path: '/facebook/disconnect'
+      fullPath: '/api/auth/facebook/disconnect'
+      preLoaderRoute: typeof ApiAuthFacebookDisconnectRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/facebook/callback': {
+      id: '/api/auth/facebook/callback'
+      path: '/facebook/callback'
+      fullPath: '/api/auth/facebook/callback'
+      preLoaderRoute: typeof ApiAuthFacebookCallbackRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
   }
 }
 
@@ -890,6 +1025,12 @@ interface ApiAuthRouteChildren {
   ApiAuthSigninRoute: typeof ApiAuthSigninRoute
   ApiAuthSignoutRoute: typeof ApiAuthSignoutRoute
   ApiAuthSignupRoute: typeof ApiAuthSignupRoute
+  ApiAuthFacebookCallbackRoute: typeof ApiAuthFacebookCallbackRoute
+  ApiAuthFacebookDisconnectRoute: typeof ApiAuthFacebookDisconnectRoute
+  ApiAuthFacebookStartRoute: typeof ApiAuthFacebookStartRoute
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
+  ApiAuthGoogleDisconnectRoute: typeof ApiAuthGoogleDisconnectRoute
+  ApiAuthGoogleStartRoute: typeof ApiAuthGoogleStartRoute
 }
 
 const ApiAuthRouteChildren: ApiAuthRouteChildren = {
@@ -899,6 +1040,12 @@ const ApiAuthRouteChildren: ApiAuthRouteChildren = {
   ApiAuthSigninRoute: ApiAuthSigninRoute,
   ApiAuthSignoutRoute: ApiAuthSignoutRoute,
   ApiAuthSignupRoute: ApiAuthSignupRoute,
+  ApiAuthFacebookCallbackRoute: ApiAuthFacebookCallbackRoute,
+  ApiAuthFacebookDisconnectRoute: ApiAuthFacebookDisconnectRoute,
+  ApiAuthFacebookStartRoute: ApiAuthFacebookStartRoute,
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
+  ApiAuthGoogleDisconnectRoute: ApiAuthGoogleDisconnectRoute,
+  ApiAuthGoogleStartRoute: ApiAuthGoogleStartRoute,
 }
 
 const ApiAuthRouteWithChildren =
@@ -938,6 +1085,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTwilioInboundRoute: ApiTwilioInboundRoute,
   BSlugConfirmedRoute: BSlugConfirmedRoute,
+  ApiMetaWaWebhookRoute: ApiMetaWaWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

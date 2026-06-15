@@ -438,6 +438,7 @@ export function getSystemHealth() {
     twilioConfigured: Boolean(
       env?.TWILIO_ACCOUNT_SID && env?.TWILIO_AUTH_TOKEN && env?.TWILIO_WHATSAPP_FROM,
     ),
+    googleConfigured: Boolean(env?.GOOGLE_CLIENT_ID && env?.GOOGLE_CLIENT_SECRET),
     paddleConfigured: billing.paddle,
     dodoConfigured: billing.dodo,
     paypalManualConfigured: billing.paypalManual,

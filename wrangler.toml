@@ -49,10 +49,19 @@ PAYPAL_ME_URL = "https://paypal.me/YOUR_PAYPAL_USERNAME"
 # ─── Secrets (set via `wrangler pages secret put <NAME> --project-name=randevou`)
 # Auth / platform:
 #   ADMIN_EMAILS                 comma-separated platform-admin owner emails
-# Messaging (Twilio WhatsApp):
-#   TWILIO_ACCOUNT_SID
-#   TWILIO_AUTH_TOKEN
-#   TWILIO_WHATSAPP_FROM
+# Auth — Google OAuth:
+#   GOOGLE_CLIENT_ID
+#   GOOGLE_CLIENT_SECRET
+# Auth + Messaging — Meta (Facebook Login + WhatsApp Cloud API):
+#   META_APP_ID                  Facebook App ID (used for FB Login and WA webhook)
+#   META_APP_SECRET              Facebook App Secret (FB Login token exchange + webhook sig)
+#   META_WA_TOKEN                WhatsApp Cloud API system user access token
+#   META_WA_PHONE_ID             WhatsApp Business phone number ID
+#   META_WA_VERIFY_TOKEN         Custom string you choose for webhook hub verification
+# Webhook URL to register in Meta App Dashboard:
+#   https://randevou.octolabs.app/api/meta/wa/webhook
+# Facebook Login redirect URI to whitelist in Meta App Dashboard:
+#   https://randevou.octolabs.app/api/auth/facebook/callback
 # Billing — Paddle (primary, individual/sole-trader):
 #   PADDLE_API_KEY
 #   PADDLE_WEBHOOK_SECRET

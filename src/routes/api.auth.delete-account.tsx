@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { deleteOwnerAccount, getSessionIdFromCookieHeader } from "@/lib/cf/auth";
-import { requireApiOwner, jsonError } from "@/lib/cf/api";
+import { requireApiOwner, jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 
 export const Route = createFileRoute("/api/auth/delete-account")({
   component: Empty,
@@ -9,6 +9,8 @@ export const Route = createFileRoute("/api/auth/delete-account")({
       POST: async ({ request }) => {
         const owner = await requireApiOwner(request);
         if (owner instanceof Response) return owner;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const { confirm } = (await request.json()) as { confirm?: string };
           if (confirm !== "DELETE") {

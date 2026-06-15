@@ -132,6 +132,13 @@ export function disconnectGoogleAccount(): Promise<void> {
   });
 }
 
+export function disconnectFacebookAccount(): Promise<void> {
+  return api("/api/auth/facebook/disconnect", {
+    method: "POST",
+    body: jsonBody({}),
+  });
+}
+
 export function setPassword(newPassword: string): Promise<void> {
   return api("/api/auth/set-password", {
     method: "POST",

@@ -40,6 +40,11 @@ export type Owner = {
   id: string;
   email?: string | null;
   name?: string | null;
+  googleLinked?: boolean;
+  googleEmail?: string | null;
+  facebookLinked?: boolean;
+  facebookEmail?: string | null;
+  passwordLoginEnabled?: boolean;
 };
 
 export type Business = {

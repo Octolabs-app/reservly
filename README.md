@@ -17,7 +17,8 @@ confirmation with a booking reference. No app, no account.
 - **Hosting:** Cloudflare Pages (only supported target — `vite.config.ts`
   uses the `cloudflare_pages` preset; build emits `dist/_worker.js`)
 - **Database:** Cloudflare D1 (SQLite) — schema in `migrations/`
-- **Sessions:** Cloudflare KV cache + D1 `sessions` table, bcryptjs passwords
+- **Sessions:** Cloudflare KV cache + D1 `sessions` table, bcryptjs passwords,
+  optional Google owner sign-in/linking
 - **Messaging:** Twilio WhatsApp via plain REST (no SDK); logs to D1 when unset
 - **Billing:** no-BRN-friendly provider abstraction (`src/lib/cf/subscriptions.ts`)
   — see below. Free plan = 15 bookings/month, enforced in `src/lib/cf/data.ts`
@@ -97,22 +98,24 @@ Pages: `/`, `/auth`, `/onboarding`, `/b/$slug`, `/b/$slug/confirmed`,
 `/privacy`, `/terms`
 
 API: `/api/auth/{signup,signin,signout,me,delete-account}`,
+`/api/auth/google/{start,callback,disconnect}`,
 `/api/dashboard/{data,business,service,availability,booking-action,create-booking}`,
 `/api/public/{business,slots,bookings,booking}`,
 `/api/admin/{overview,businesses,owners,bookings,messaging,system,audit}`,
-`/api/twilio/inbound`. (`/api/stripe/*` remain as future-only legacy.)
+`/api/twilio/inbound`. `/api/stripe/*` return 410 until Stripe is explicitly
+approved in the future.
 
 ## Deployment
 
 Cloudflare Pages + D1 + KV. Authoritative runbook: **[DEPLOYMENT.md](DEPLOYMENT.md)**
 (architecture background in `CLOUDFLARE_SETUP.md`). Apply migrations
-0001 + 0002 + 0003 in order before serving traffic.
+0001 + 0002 + 0003 + 0004 in order before serving traffic.
 
 ## Docs
 
 - `DEPLOYMENT.md` — deploy runbook + truthful status (start here)
 - `ENVIRONMENT_VARIABLES.md` — the real env/secret surface (incl. ADMIN_EMAILS,
-  Paddle/Dodo/PayPal)
+  Google auth, Paddle/Dodo/PayPal)
 - `CLOUDFLARE_SETUP.md` — architecture and Cloudflare resource notes
 - `TWILIO_SETUP.md` — WhatsApp provider configuration
 - `docs/LOGO_DESIGN_BRIEF.md` — brief for the final logo (current mark is a

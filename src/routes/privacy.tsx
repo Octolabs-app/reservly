@@ -25,8 +25,9 @@ function PrivacyPage() {
           </p>
           <p>
             WhatsApp numbers are used for booking confirmations, owner alerts, cancellations, and
-            customer replies. Messages are delivered through Twilio. Payment data is handled by
-            Stripe and is never stored by Randevou. Application data is hosted on Cloudflare.
+            customer replies. Messages are delivered through Twilio. Owner subscription payments are
+            handled manually until an approved billing provider is configured. Application data is
+            hosted on Cloudflare.
           </p>
           <p>
             Business owners can delete their account and all associated data at any time from

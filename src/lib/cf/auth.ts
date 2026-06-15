@@ -27,6 +27,8 @@ type OwnerRow = {
   password_hash?: string | null;
   google_sub?: string | null;
   google_email?: string | null;
+  facebook_id?: string | null;
+  facebook_email?: string | null;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -68,6 +70,8 @@ function mapOwner(row: OwnerRow): Owner {
     name: row.full_name ?? row.email,
     googleLinked: Boolean(row.google_sub),
     googleEmail: row.google_email ?? null,
+    facebookLinked: Boolean(row.facebook_id),
+    facebookEmail: row.facebook_email ?? null,
     passwordLoginEnabled: Boolean(
       row.password_hash && row.password_hash !== DISABLED_PASSWORD_HASH,
     ),
@@ -129,7 +133,7 @@ export async function resolveSession(sessionId: string): Promise<Owner | null> {
   const ownerRow = await d1First<OwnerRow>(
     db
       .prepare(
-        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE id = ?",
       )
       .bind(session.owner_id),
   );
@@ -203,7 +207,7 @@ export async function signInOwner(
   const ownerRow = await d1First<OwnerRow>(
     db
       .prepare(
-        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE email = ?",
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE email = ?",
       )
       .bind(email.trim().toLowerCase()),
   );
@@ -277,7 +281,7 @@ export async function signInOrLinkGoogleOwner(input: {
   const ownerByGoogle = await d1First<OwnerRow>(
     db
       .prepare(
-        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE google_sub = ?",
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE google_sub = ?",
       )
       .bind(input.googleSub),
   );
@@ -307,7 +311,7 @@ export async function signInOrLinkGoogleOwner(input: {
     const row = await d1First<OwnerRow>(
       db
         .prepare(
-          "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+          "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE id = ?",
         )
         .bind(input.linkOwnerId),
     );
@@ -319,7 +323,7 @@ export async function signInOrLinkGoogleOwner(input: {
   const ownerByEmail = await d1First<OwnerRow>(
     db
       .prepare(
-        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE email = ?",
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE email = ?",
       )
       .bind(cleanEmail),
   );
@@ -380,7 +384,7 @@ export async function disconnectGoogleOwner(ownerId: string): Promise<Owner> {
   const row = await d1First<OwnerRow>(
     db
       .prepare(
-        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE id = ?",
       )
       .bind(ownerId),
   );
@@ -423,7 +427,7 @@ export async function setPasswordOwner(ownerId: string, newPassword: string): Pr
   const row = await d1First<OwnerRow>(
     db
       .prepare(
-        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE id = ?",
       )
       .bind(ownerId),
   );
@@ -463,4 +467,148 @@ export async function signOutOwner(sessionId: string): Promise<string> {
 
 export function authModeLabel(): string {
   return isD1Enabled() ? "Cloudflare D1 Auth" : "Local dev mode";
+}
+
+// ─── Facebook OAuth ───────────────────────────────────────────────────────────
+
+export async function signInOrLinkFacebookOwner(input: {
+  facebookId: string;
+  email: string;
+  name?: string | null;
+  linkOwnerId?: string | null;
+}): Promise<{ owner: Owner; sessionCookie: string }> {
+  if (!isD1Enabled()) throw new Error("Facebook sign-in is unavailable in local dev mode.");
+
+  const db = getD1()!;
+  const cleanEmail = input.email.trim().toLowerCase();
+  const cleanName = input.name?.trim() || cleanEmail;
+
+  // Already linked to this Facebook ID → just sign in.
+  const ownerByFacebook = await d1First<OwnerRow>(
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE facebook_id = ?",
+      )
+      .bind(input.facebookId),
+  );
+  if (ownerByFacebook) {
+    const owner = mapOwner(ownerByFacebook);
+    return { owner, sessionCookie: await createOwnerSession(owner) };
+  }
+
+  // Linking mode: attach to an existing signed-in owner.
+  if (input.linkOwnerId) {
+    const linkedElsewhere = await d1First<{ id: string }>(
+      db.prepare("SELECT id FROM owners WHERE facebook_id = ?").bind(input.facebookId),
+    );
+    if (linkedElsewhere && linkedElsewhere.id !== input.linkOwnerId) {
+      throw new Error("That Facebook account is already connected to another owner.");
+    }
+    await d1Run(
+      db
+        .prepare(
+          `UPDATE owners SET
+             facebook_id = ?, facebook_email = ?, facebook_name = ?,
+             facebook_linked_at = datetime('now'), updated_at = datetime('now')
+           WHERE id = ?`,
+        )
+        .bind(input.facebookId, cleanEmail, cleanName, input.linkOwnerId),
+    );
+    const row = await d1First<OwnerRow>(
+      db
+        .prepare(
+          "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE id = ?",
+        )
+        .bind(input.linkOwnerId),
+    );
+    if (!row) throw new Error("Owner not found.");
+    const owner = mapOwner(row);
+    return { owner, sessionCookie: await createOwnerSession(owner) };
+  }
+
+  // Email match → link Facebook to the existing account automatically.
+  const ownerByEmail = await d1First<OwnerRow>(
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE email = ?",
+      )
+      .bind(cleanEmail),
+  );
+  if (ownerByEmail) {
+    await d1Run(
+      db
+        .prepare(
+          `UPDATE owners SET
+             facebook_id = ?, facebook_email = ?, facebook_name = ?,
+             facebook_linked_at = datetime('now'), updated_at = datetime('now')
+           WHERE id = ?`,
+        )
+        .bind(input.facebookId, cleanEmail, cleanName, ownerByEmail.id),
+    );
+    const owner = mapOwner({
+      ...ownerByEmail,
+      facebook_id: input.facebookId,
+      facebook_email: cleanEmail,
+    });
+    return { owner, sessionCookie: await createOwnerSession(owner) };
+  }
+
+  // New owner — create account via Facebook.
+  const ownerId = crypto.randomUUID();
+  await d1Run(
+    db
+      .prepare(
+        `INSERT INTO owners
+           (id, email, password_hash, full_name, facebook_id, facebook_email, facebook_name,
+            facebook_linked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      )
+      .bind(
+        ownerId,
+        cleanEmail,
+        DISABLED_PASSWORD_HASH,
+        cleanName,
+        input.facebookId,
+        cleanEmail,
+        cleanName,
+      ),
+  );
+
+  const owner: Owner = {
+    id: ownerId,
+    email: cleanEmail,
+    name: cleanName,
+    facebookLinked: true,
+    facebookEmail: cleanEmail,
+    passwordLoginEnabled: false,
+  };
+  return { owner, sessionCookie: await createOwnerSession(owner) };
+}
+
+export async function disconnectFacebookOwner(ownerId: string): Promise<Owner> {
+  if (!isD1Enabled()) throw new Error("Facebook account linking is unavailable in local dev mode.");
+  const db = getD1()!;
+  const row = await d1First<OwnerRow>(
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email, facebook_id, facebook_email FROM owners WHERE id = ?",
+      )
+      .bind(ownerId),
+  );
+  if (!row) throw new Error("Owner not found.");
+  if (!row.facebook_id) return mapOwner(row);
+  if (!row.password_hash || row.password_hash === DISABLED_PASSWORD_HASH) {
+    throw new Error("Add an email/password login before disconnecting Facebook.");
+  }
+  await d1Run(
+    db
+      .prepare(
+        `UPDATE owners SET
+           facebook_id = NULL, facebook_email = NULL, facebook_name = NULL,
+           facebook_linked_at = NULL, updated_at = datetime('now')
+         WHERE id = ?`,
+      )
+      .bind(ownerId),
+  );
+  return mapOwner({ ...row, facebook_id: null, facebook_email: null });
 }

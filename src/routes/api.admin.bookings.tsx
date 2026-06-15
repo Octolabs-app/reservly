@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { jsonError } from "@/lib/cf/api";
+import { jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 import { adminSetBookingStatus, listAdminBookings, requirePlatformAdmin } from "@/lib/cf/admin";
 
 type Body = { action: "confirm" | "cancel"; bookingId: string };
@@ -25,6 +25,8 @@ export const Route = createFileRoute("/api/admin/bookings")({
       POST: async ({ request }) => {
         const admin = await requirePlatformAdmin(request);
         if (admin instanceof Response) return admin;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const body = (await request.json()) as Body;
           if (!body.bookingId) return jsonError(new Error("bookingId required."));

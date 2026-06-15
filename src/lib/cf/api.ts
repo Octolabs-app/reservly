@@ -9,8 +9,17 @@ export function jsonError(error: unknown, status = 400) {
   );
 }
 
+function originFrom(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * CA-11: Verify the request Origin header matches our canonical host.
+ * Verify the request Origin (or Referer) matches our canonical host.
  * Only enforced on state-changing methods (POST/PATCH/PUT/DELETE).
  * Returns a 403 Response if the check fails, null if it passes.
  *
@@ -21,19 +30,25 @@ export function jsonError(error: unknown, status = 400) {
 export function requireSameOriginMutation(request: Request): Response | null {
   const method = request.method.toUpperCase();
   if (method === "GET" || method === "HEAD" || method === "OPTIONS") return null;
-  const origin = request.headers.get("origin");
-  if (!origin) return null; // no Origin → SameSite=Lax handles it
-  // In local dev (no CF env) allow any localhost origin.
-  const siteUrl = getCFEnv()?.SITE_URL ?? "";
-  if (!siteUrl) {
-    if (origin.startsWith("http://localhost") || origin.startsWith("http://127.0.0.1")) {
-      return null;
-    }
-  } else {
-    const expected = new URL(siteUrl).origin;
-    if (origin === expected) return null;
+
+  const requestOrigin = new URL(request.url).origin;
+  const allowed = new Set([requestOrigin]);
+  const siteUrl = getCFEnv()?.SITE_URL;
+  if (siteUrl) allowed.add(new URL(siteUrl).origin);
+
+  // In local dev, allow any localhost origin.
+  const isLocalhost = requestOrigin.startsWith("http://localhost") ||
+    requestOrigin.startsWith("http://127.0.0.1");
+  if (isLocalhost) return null;
+
+  const sourceOrigin =
+    originFrom(request.headers.get("origin")) ?? originFrom(request.headers.get("referer"));
+
+  if (!sourceOrigin || !allowed.has(sourceOrigin)) {
+    return Response.json({ error: "Invalid request origin." }, { status: 403 });
   }
-  return Response.json({ error: "Forbidden." }, { status: 403 });
+
+  return null;
 }
 
 export async function requireApiOwner(request: Request): Promise<Owner | Response> {

@@ -1,21 +1,25 @@
 # Environment Variables
 
 Never commit real secrets. Locally, **nothing is required** (the in-browser dev
-store runs without credentials). In production, set non-secret vars in
-`wrangler.toml` `[vars]` / the Cloudflare Pages dashboard, and secrets via
-`wrangler pages secret put <NAME> --project-name=randevou`.
+store runs without credentials). In production, set non-secret runtime vars in
+`wrangler.toml` `[vars]` and secrets via
+`wrangler pages secret put <NAME> --project-name=randevou`. Do not rely on
+Cloudflare dashboard vars for runtime values; Pages advanced mode reads the
+`wrangler.toml` configuration.
 
 ## Server (Cloudflare Pages bindings + vars)
 
 | Variable               | Required   | Purpose                                                                                                                                       |
 | ---------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DB` (D1 binding)      | yes        | Cloudflare D1 database (`randevou-db`).                                                                                                       |
-| `KV` (KV binding)      | yes        | Session cache + rate-limit counters (`randevou-sessions`).                                                                                    |
+| `KV` (KV binding)      | yes        | Session cache, OAuth state, and rate-limit counters (`randevou-sessions`).                                                                    |
 | `SITE_URL`             | yes        | Public site URL, no trailing slash (`https://randevou.octolabs.app`). Used in WhatsApp links, booking links, and Twilio signature validation. |
 | `ADMIN_EMAILS`         | for /admin | Comma-separated owner emails allowed into the platform admin (`/admin`). Empty = nobody can access admin in production.                       |
 | `TWILIO_ACCOUNT_SID`   | no\*       | Twilio account SID.                                                                                                                           |
 | `TWILIO_AUTH_TOKEN`    | no\*       | Twilio auth token — also validates inbound webhook signatures.                                                                                |
 | `TWILIO_WHATSAPP_FROM` | no\*       | WhatsApp sender, e.g. `whatsapp:+14155238886`.                                                                                                |
+| `GOOGLE_CLIENT_ID`     | no         | Google OAuth web client ID. Set in `wrangler.toml` `[vars]` when Google owner sign-in is enabled.                                             |
+| `GOOGLE_CLIENT_SECRET` | no         | Google OAuth web client secret. Store with `wrangler pages secret put`; never commit it.                                                       |
 
 \* Optional at launch: without Twilio vars, outbound messages are logged to the
 D1 `message_events` table instead of being sent, and the app still works.
@@ -49,10 +53,9 @@ provider when approved; until then upgrades are handled manually by an admin.
 **PayPal manual fallback:** no env vars. An admin marks an owner paid in
 `/admin → Businesses → Mark paid` (stored as `provider = paypal_manual`).
 
-**Stripe — future only (do not configure now):** `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_STUDIO_MONTHLY`.
-Used only if Octolabs later has a supported legal/business setup. The app does
-not require or auto-select Stripe.
+**Stripe — future only:** no Stripe env vars are used now. The app does not
+require, read, or auto-select Stripe unless Octolabs later approves a supported
+legal/business setup and a new implementation is shipped.
 
 The admin **System** tab shows which providers are configured (yes/no) without
 revealing any secret values.

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { requireApiOwner, jsonError } from "@/lib/cf/api";
+import { requireApiOwner, jsonError, requireSameOriginMutation } from "@/lib/cf/api";
 import { createService, deleteService, updateService } from "@/lib/cf/data";
 import type { ServiceInput } from "@/lib/randevou/types";
 
@@ -15,6 +15,8 @@ export const Route = createFileRoute("/api/dashboard/service")({
       POST: async ({ request }) => {
         const owner = await requireApiOwner(request);
         if (owner instanceof Response) return owner;
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
         try {
           const body = (await request.json()) as ServiceRequest;
           if (body.action === "create") {

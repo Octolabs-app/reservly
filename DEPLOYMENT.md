@@ -5,7 +5,7 @@ Randevou deploys to **Cloudflare Pages** with **D1** (database) and **KV**
 **https://randevou.octolabs.app** — the default `randevou.pages.dev` URL is
 internal only and must never be customer-facing.
 
-## Current state (2026-06-13) — truthful status
+## Current state (2026-06-15) — truthful status
 
 - **Local checks: GREEN.** `npm ci`, `npm run typecheck`, `npm run build`, and
   `npm run lint` (0 errors; 6 known shadcn/ui fast-refresh warnings) all pass on
@@ -13,12 +13,14 @@ internal only and must never be customer-facing.
 - **Cloudflare resources: CREATED.** `randevou-db` (D1, id
   `de89f943-0ad7-452f-9dba-e9bf27df839f`) and `randevou-sessions` (KV, id
   `e4babc1547ca4b7b8f2aaad412801836`) exist and have migrations **0001 + 0002 +
-  0003** applied (verified: 10 tables incl. `admin_audit_events`). These IDs are
+  0003** applied (verified: 10 tables incl. `admin_audit_events`). Migration
+  **0004** adds optional Google owner account linking and must be applied before
+  deploying code that exposes Google login. These IDs are
   already wired into `wrangler.toml`.
-- **NOT deployed yet.** No Pages project has been created/deployed from this
-  machine (no `wrangler login` session here). `randevou.octolabs.app` has no DNS
-  record yet. The steps below must be run by the founder. **Do not consider the
-  app "live" until step 4 succeeds and the custom domain resolves.**
+- **Production is live at `https://randevou.octolabs.app`.** This hardening /
+  Google-account batch has **not** been deployed or migrated yet from this
+  workspace. Apply migration **0004** before deploying this code, because owner
+  session reads now include the Google account columns.
 
 ## Preflight (re-run before deploying)
 
@@ -41,10 +43,11 @@ wrangler login                       # opens browser; authorise the Octolabs acc
 #    wrangler kv namespace create randevou-sessions
 
 # 2. Migrations are already applied to the existing randevou-db. If you create a
-#    NEW database, apply all three IN ORDER:
+#    NEW database, apply all migrations IN ORDER:
 wrangler d1 execute randevou-db --remote --file=migrations/0001_rezavu_core.sql
 wrangler d1 execute randevou-db --remote --file=migrations/0002_booking_rules.sql
 wrangler d1 execute randevou-db --remote --file=migrations/0003_admin_and_billing.sql
+wrangler d1 execute randevou-db --remote --file=migrations/0004_google_owner_accounts.sql
 
 # 3. Build:
 npm run build
@@ -52,15 +55,19 @@ npm run build
 # 4. Create the Pages project + deploy (this is what makes it live):
 wrangler pages deploy ./dist --project-name=randevou
 
-# 5. Required secrets/vars:
-wrangler pages secret put ADMIN_EMAILS --project-name=randevou   # e.g. you@octolabs.app
+# 5. Required vars/secrets:
+#   SITE_URL and ADMIN_EMAILS are non-secret runtime vars in wrangler.toml [vars].
+#   Do not rely on Cloudflare dashboard runtime vars in advanced mode.
 # Optional — messaging (without these, messages log instead of send):
 wrangler pages secret put TWILIO_ACCOUNT_SID --project-name=randevou
 wrangler pages secret put TWILIO_AUTH_TOKEN --project-name=randevou
 wrangler pages secret put TWILIO_WHATSAPP_FROM --project-name=randevou
+# Optional — Google owner sign-in / linking:
+#   Set GOOGLE_CLIENT_ID in wrangler.toml [vars].
+wrangler pages secret put GOOGLE_CLIENT_SECRET --project-name=randevou
 # Optional — billing (only when a provider is approved; see ENVIRONMENT_VARIABLES.md):
 #   PADDLE_* (primary) or DODO_* (backup). PayPal manual needs no secrets.
-#   Stripe is future-only — do not set its keys yet.
+#   Stripe is future-only — there are no active Stripe secrets.
 ```
 
 > Migration filenames keep the historical `0001_rezavu_core.sql` name on purpose
@@ -80,13 +87,14 @@ Pages project ever appears in the dashboard, delete it; it was never served.)
    CNAME is created automatically.
 2. Set build env vars (Pages → Settings → Environment variables, Production):
    - `VITE_SITE_URL=https://randevou.octolabs.app`
-   - `SITE_URL=https://randevou.octolabs.app` (also in `wrangler.toml` `[vars]`)
+   - `SITE_URL=https://randevou.octolabs.app` stays in `wrangler.toml` `[vars]`
 3. Re-deploy after setting build vars (`VITE_` vars are baked at build time).
 
 **What can and cannot be hidden:**
 
 - `randevou.pages.dev` always exists — Cloudflare does not allow deleting the
-  default Pages subdomain. That is fine: it is never shown to users.
+  default Pages subdomain. The Worker now returns 503 for non-canonical hosts,
+  including `randevou.pages.dev`.
 - Everything customer-facing (dashboard share link, WhatsApp messages, booking
   confirmations, canonical metadata) is generated from `SITE_URL` /
   `VITE_SITE_URL`, so with the vars above users only ever see
@@ -99,6 +107,8 @@ Pages project ever appears in the dashboard, delete it; it was never served.)
 
 - Twilio WhatsApp inbound: `https://randevou.octolabs.app/api/twilio/inbound`
   (the handler verifies `X-Twilio-Signature`).
+- Google OAuth redirect URI, if enabled:
+  `https://randevou.octolabs.app/api/auth/google/callback`.
 
 ## Manual checks after deploy
 

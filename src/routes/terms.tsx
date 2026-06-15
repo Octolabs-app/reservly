@@ -29,8 +29,9 @@ function TermsPage() {
             unlimited inside the application.
           </p>
           <p>
-            WhatsApp delivery and card payments depend on third-party providers (Twilio and Stripe).
-            Randevou is not liable for outages or delivery failures of those providers.
+            WhatsApp delivery depends on Twilio. Owner subscription upgrades are handled manually
+            until an approved billing provider is configured. Randevou is not liable for outages or
+            delivery failures of third-party providers.
           </p>
         </Panel>
       </Page>

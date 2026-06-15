@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS message_events (
 CREATE INDEX IF NOT EXISTS message_events_business_idx ON message_events(business_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS message_events_booking_idx  ON message_events(booking_id);
 
--- ─── Subscriptions (Stripe billing state) ────────────────────────────────────
+-- ─── Subscriptions (billing state; legacy Stripe columns are unused) ─────────
 CREATE TABLE IF NOT EXISTS subscriptions (
   id                     TEXT PRIMARY KEY,
   business_id            TEXT NOT NULL UNIQUE REFERENCES businesses(id) ON DELETE CASCADE,

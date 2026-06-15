@@ -72,7 +72,7 @@ export function getBillingConfig() {
     paddle: Boolean(env?.PADDLE_API_KEY && env?.PADDLE_PRICE_PRO),
     dodo: Boolean(env?.DODO_API_KEY && env?.DODO_PRICE_PRO),
     paypalManual: true, // always available — needs no credentials
-    stripe: Boolean(env?.STRIPE_SECRET_KEY),
+    stripe: false, // future-only; Stripe credentials are intentionally ignored.
   };
 }
 

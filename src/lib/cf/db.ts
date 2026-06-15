@@ -49,10 +49,16 @@ export type CloudflareEnv = {
   SITE_URL?: string;
   // Platform admin gate (comma-separated owner emails)
   ADMIN_EMAILS?: string;
-  // Messaging — Twilio WhatsApp
-  TWILIO_ACCOUNT_SID?: string;
-  TWILIO_AUTH_TOKEN?: string;
-  TWILIO_WHATSAPP_FROM?: string;
+  // Auth — Google OAuth
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  // Auth + Messaging — Meta (Facebook Login + WhatsApp Cloud API)
+  META_APP_ID?: string;
+  META_APP_SECRET?: string;
+  // WhatsApp Cloud API (send messages)
+  META_WA_TOKEN?: string;
+  META_WA_PHONE_ID?: string;
+  META_WA_VERIFY_TOKEN?: string;
   // Billing — Paddle (primary, individual/sole-trader)
   PADDLE_API_KEY?: string;
   PADDLE_WEBHOOK_SECRET?: string;

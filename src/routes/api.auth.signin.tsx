@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { signInOwner } from "@/lib/cf/auth";
+import { passwordLengthError, signInOwner } from "@/lib/cf/auth";
+import { requireSameOriginMutation } from "@/lib/cf/api";
 import { allowRequest, clientIp } from "@/lib/cf/rate-limit";
 
 export const Route = createFileRoute("/api/auth/signin")({
@@ -7,9 +8,16 @@ export const Route = createFileRoute("/api/auth/signin")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const originError = requireSameOriginMutation(request);
+        if (originError) return originError;
+
         const { email, password } = (await request.json()) as { email?: string; password?: string };
         if (!email || !password) {
           return Response.json({ error: "Email and password required." }, { status: 400 });
+        }
+        const lengthError = passwordLengthError(password);
+        if (lengthError) {
+          return Response.json({ error: lengthError }, { status: 400 });
         }
 
         // Throttle per IP and per target email to slow credential brute force.

@@ -101,6 +101,7 @@ type OverviewData = {
 };
 type SystemData = {
   twilioConfigured: boolean;
+  googleConfigured: boolean;
   paddleConfigured: boolean;
   dodoConfigured: boolean;
   paypalManualConfigured: boolean;
@@ -693,6 +694,7 @@ function BillingTab() {
   const { data } = useEndpoint<SystemData>("/api/admin/system");
   if (!data) return <Loading />;
   const rows: [string, boolean][] = [
+    ["Google sign-in", data.googleConfigured],
     ["Paddle (individual)", data.paddleConfigured],
     ["Dodo Payments (individual)", data.dodoConfigured],
     ["PayPal manual mode", data.paypalManualConfigured],
@@ -770,10 +772,11 @@ function SystemTab() {
   if (!data) return <Loading />;
   const rows: [string, boolean][] = [
     ["Twilio (WhatsApp) configured", data.twilioConfigured],
+    ["Google sign-in configured", data.googleConfigured],
     ["Paddle configured", data.paddleConfigured],
     ["Dodo configured", data.dodoConfigured],
     ["PayPal manual mode", data.paypalManualConfigured],
-    ["Stripe configured (legacy/future)", data.stripeConfigured],
+    ["Stripe future-only", data.stripeConfigured],
     ["D1 binding available", data.d1Available],
     ["KV binding available", data.kvAvailable],
   ];
