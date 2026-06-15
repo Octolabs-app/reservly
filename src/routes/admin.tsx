@@ -68,6 +68,9 @@ type BizRow = {
   owner_email?: string | null;
   booking_limit_monthly?: number | null;
   booking_count?: number;
+  sub_status?: string | null;
+  sub_end?: string | null;
+  sub_ref?: string | null;
 };
 type OwnerRow = {
   id: string;
@@ -243,10 +246,12 @@ function OverviewTab() {
         <Stat label="Today" value={data.bookingsToday} />
         <Stat label="This month" value={data.bookingsThisMonth} />
       </div>
-      <div className="grid grid-cols-3 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
         <Stat label="Free" value={data.planCounts.free ?? 0} />
         <Stat label="Pro" value={data.planCounts.pro ?? 0} />
-        <Stat label="Studio" value={data.planCounts.studio ?? 0} />
+        {(data.planCounts.studio ?? 0) > 0 && (
+          <Stat label="Studio (legacy)" value={data.planCounts.studio ?? 0} />
+        )}
       </div>
 
       <div>
@@ -330,24 +335,66 @@ function OverviewTab() {
 }
 
 /* ─── Businesses ─────────────────────────────────────────────────────────── */
+const DURATION_OPTIONS = [
+  { label: "1 month",  days: 30 },
+  { label: "3 months", days: 90 },
+  { label: "6 months", days: 180 },
+  { label: "1 year",   days: 365 },
+];
+
 function BusinessesTab() {
   const [q, setQ] = useState("");
   const { data, reload } = useEndpoint<{ businesses: BizRow[] }>(
     `/api/admin/businesses?q=${encodeURIComponent(q)}`,
   );
+  const [panel, setPanel] = useState<BizRow | null>(null);
+  const [panelPlan, setPanelPlan] = useState<"free" | "pro">("pro");
+  const [panelDays, setPanelDays] = useState(30);
+  const [panelRef, setPanelRef] = useState("");
+  const [panelNote, setPanelNote] = useState("");
+  const [panelSaving, setPanelSaving] = useState(false);
+
+  function openPanel(b: BizRow) {
+    setPanel(b);
+    setPanelPlan(b.plan === "pro" ? "pro" : "free");
+    setPanelDays(30);
+    setPanelRef(b.sub_ref ?? "");
+    setPanelNote("");
+  }
 
   async function act(body: Record<string, unknown>) {
+    await api("/api/admin/businesses", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    reload();
+  }
+
+  async function savePanel() {
+    if (!panel) return;
+    setPanelSaving(true);
     try {
-      await api("/api/admin/businesses", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+      await act({
+        action: "manual_pay",
+        businessId: panel.id,
+        plan: panelPlan,
+        provider: "paypal_manual",
+        reference: panelRef.trim() || null,
+        note: panelNote.trim() || null,
+        periodDays: panelPlan === "free" ? 0 : panelDays,
       });
-      reload();
+      setPanel(null);
     } catch (e) {
       alert((e as Error).message);
+    } finally {
+      setPanelSaving(false);
     }
   }
+
+  const expiryPreview = panelPlan === "pro" && panelDays > 0
+    ? new Date(Date.now() + panelDays * 86_400_000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
 
   return (
     <div className="space-y-3">
@@ -366,7 +413,7 @@ function BusinessesTab() {
               <TH>Business</TH>
               <TH>Owner</TH>
               <TH>Plan</TH>
-              <TH>Limit</TH>
+              <TH>Sub expires</TH>
               <TH>Bookings</TH>
               <TH>Link</TH>
               <TH>Actions</TH>
@@ -374,71 +421,129 @@ function BusinessesTab() {
           </thead>
           <tbody>
             {data.businesses.map((b) => (
-              <tr key={b.id}>
-                <TD>{b.name}</TD>
-                <TD>{b.owner_email ?? "—"}</TD>
-                <TD>
-                  <span className="font-semibold capitalize">{b.plan}</span>
-                </TD>
-                <TD>{b.booking_limit_monthly ?? "∞"}</TD>
-                <TD>{b.booking_count}</TD>
-                <TD>
-                  <a
-                    href={`/b/${b.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    /b/{b.slug}
-                  </a>
-                </TD>
-                <TD>
-                  <div className="flex flex-wrap gap-1">
-                    <select
-                      defaultValue={b.plan}
-                      onChange={(e) =>
-                        act({ action: "update_plan", businessId: b.id, plan: e.target.value })
-                      }
-                      className="rounded border border-border bg-white px-1.5 py-1 text-xs"
-                    >
-                      <option value="free">free</option>
-                      <option value="pro">pro</option>
-                      <option value="studio">studio</option>
-                    </select>
-                    <button
-                      onClick={() => {
-                        const v = prompt("Monthly booking limit (blank = unlimited):", "");
-                        if (v === null) return;
-                        act({
-                          action: "update_limit",
-                          businessId: b.id,
-                          limit: v.trim() === "" ? null : Number(v),
-                        });
-                      }}
-                      className="rounded border border-border px-2 py-1 text-xs hover:bg-surface"
-                    >
-                      Limit
-                    </button>
-                    <button
-                      onClick={() => {
-                        const plan = prompt("Mark paid — plan (pro/studio/free):", "pro");
-                        if (!plan) return;
-                        const note = prompt("Payment note (e.g. PayPal ref):", "") ?? "";
-                        act({
-                          action: "manual_pay",
-                          businessId: b.id,
-                          plan,
-                          provider: "paypal_manual",
-                          note,
-                        });
-                      }}
-                      className="rounded border border-success/40 bg-success-soft px-2 py-1 text-xs text-success"
-                    >
-                      Mark paid
-                    </button>
-                  </div>
-                </TD>
-              </tr>
+              <>
+                <tr key={b.id} className={panel?.id === b.id ? "bg-primary-soft/40" : ""}>
+                  <TD>
+                    <div className="font-medium">{b.name}</div>
+                    <div className="text-[11px] text-muted-foreground">{b.slug}</div>
+                  </TD>
+                  <TD>{b.owner_email ?? "—"}</TD>
+                  <TD>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      b.plan === "pro" ? "bg-primary text-white" : "bg-surface-2 text-muted-foreground"
+                    }`}>
+                      {b.plan}
+                    </span>
+                  </TD>
+                  <TD>
+                    {b.sub_end
+                      ? new Date(b.sub_end + (b.sub_end.includes("T") ? "" : "Z")).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                      : <span className="text-muted-foreground">—</span>
+                    }
+                  </TD>
+                  <TD>{b.booking_count ?? 0}</TD>
+                  <TD>
+                    <a href={`/b/${b.slug}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      /b/{b.slug}
+                    </a>
+                  </TD>
+                  <TD>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => panel?.id === b.id ? setPanel(null) : openPanel(b)}
+                        className={`rounded px-2.5 py-1.5 text-xs font-medium ${
+                          panel?.id === b.id
+                            ? "border border-border bg-white text-muted-foreground"
+                            : "border border-success/40 bg-success-soft text-success"
+                        }`}
+                      >
+                        {panel?.id === b.id ? "Close" : b.plan === "pro" ? "Manage" : "Activate Pro"}
+                      </button>
+                    </div>
+                  </TD>
+                </tr>
+
+                {panel?.id === b.id && (
+                  <tr key={`${b.id}-panel`}>
+                    <td colSpan={7} className="border-b border-border/60 bg-primary-soft/20 px-4 py-4">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        {/* Plan */}
+                        <div>
+                          <div className="kicker mb-1.5">Plan</div>
+                          <div className="flex gap-1.5">
+                            {(["free", "pro"] as const).map((p) => (
+                              <button
+                                key={p}
+                                onClick={() => setPanelPlan(p)}
+                                className={`rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+                                  panelPlan === p
+                                    ? "bg-primary text-white"
+                                    : "border border-border bg-white text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Duration */}
+                        <div>
+                          <div className="kicker mb-1.5">Duration</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {DURATION_OPTIONS.map((d) => (
+                              <button
+                                key={d.days}
+                                disabled={panelPlan === "free"}
+                                onClick={() => setPanelDays(d.days)}
+                                className={`rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
+                                  panelDays === d.days && panelPlan === "pro"
+                                    ? "bg-primary text-white"
+                                    : "border border-border bg-white text-muted-foreground hover:text-foreground disabled:opacity-40"
+                                }`}
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-1 text-[11px] text-muted-foreground">
+                            Expires: <span className="font-medium text-foreground">{expiryPreview}</span>
+                          </div>
+                        </div>
+
+                        {/* Payment ref */}
+                        <div>
+                          <label className="kicker mb-1.5 block">PayPal / payment ref</label>
+                          <input
+                            value={panelRef}
+                            onChange={(e) => setPanelRef(e.target.value)}
+                            placeholder="PayPal transaction ID…"
+                            className="input-field text-xs"
+                          />
+                        </div>
+
+                        {/* Note + save */}
+                        <div>
+                          <label className="kicker mb-1.5 block">Note (optional)</label>
+                          <input
+                            value={panelNote}
+                            onChange={(e) => setPanelNote(e.target.value)}
+                            placeholder="e.g. Paid via bank transfer"
+                            className="input-field text-xs"
+                          />
+                          <button
+                            disabled={panelSaving}
+                            onClick={savePanel}
+                            className="btn-solid mt-2 w-full py-2 text-xs"
+                          >
+                            {panelSaving ? "Saving…" : panelPlan === "pro" ? `✓ Activate Pro (${DURATION_OPTIONS.find(d => d.days === panelDays)?.label})` : "Revert to Free"}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
           </tbody>
         </TableWrap>

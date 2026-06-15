@@ -64,6 +64,13 @@ function DashboardLayout() {
           </nav>
 
           <div className="flex items-center gap-2.5">
+            <Link
+              to="/help"
+              className="min-h-10 rounded-lg px-2 text-xs text-white/45 transition-colors hover:text-white"
+              title="Help & FAQ"
+            >
+              Help
+            </Link>
             <button
               onClick={signOut}
               className="min-h-10 rounded-lg px-2 text-xs text-white/45 transition-colors hover:text-white"

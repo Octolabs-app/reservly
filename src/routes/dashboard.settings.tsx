@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { getRegionalProPrice } from "@/lib/randevou/pricing";
 import { EmptyState, Panel } from "@/components/randevou/AppShell";
 import {
   createService,
@@ -17,7 +18,6 @@ import type {
   BookingLanguage,
   Business,
   DashboardData,
-  Plan,
   Service,
 } from "@/lib/randevou/types";
 
@@ -65,7 +65,9 @@ function SettingsTab() {
   const [services, setServices] = useState<Service[]>([]);
   const [availability, setAvailability] = useState<Availability[]>([]);
   const [saving, setSaving] = useState(false);
-  const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [billingConfig, setBillingConfig] = useState<{ paypalUrl: string | null; contactEmail: string } | null>(null);
+  const proPrice = getRegionalProPrice();
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<Tone>("success");
   const [removeTarget, setRemoveTarget] = useState<Service | null>(null);
@@ -86,15 +88,6 @@ function SettingsTab() {
 
   useEffect(() => {
     void refresh();
-    // Surface the Stripe checkout result after the redirect back.
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "success") {
-      notify("✓ Payment received — your plan upgrades as soon as Stripe confirms it.", "success");
-      window.history.replaceState({}, "", "/dashboard/settings");
-    } else if (params.get("checkout") === "cancelled") {
-      notify("Checkout cancelled — no changes made.", "info");
-      window.history.replaceState({}, "", "/dashboard/settings");
-    }
   }, []);
 
   function notify(text: string, tone: Tone = "success") {
@@ -231,13 +224,14 @@ function SettingsTab() {
   // Online (automated) billing is not live yet. Until a provider (Paddle /
   // Dodo, as an individual/sole-trader) is approved, upgrades are arranged
   // manually — we never pretend a card checkout exists.
-  function requestUpgrade(plan: Extract<Plan, "pro" | "studio">) {
-    setCheckoutPlan(plan);
-    notify(
-      `To move to the ${plan === "pro" ? "Pro" : "Studio"} plan, email hello@octolabs.app — online card billing is being set up and we'll activate your plan manually in the meantime.`,
-      "info",
-    );
-    setCheckoutPlan(null);
+  function requestUpgrade() {
+    setShowUpgrade(true);
+    if (!billingConfig) {
+      fetch("/api/billing/config", { credentials: "include" })
+        .then((r) => r.json())
+        .then((d) => setBillingConfig(d))
+        .catch(() => setBillingConfig({ paypalUrl: null, contactEmail: "hello@octolabs.app" }));
+    }
   }
 
   async function signOut() {
@@ -321,23 +315,13 @@ function SettingsTab() {
               </span>
             </div>
           </div>
-          {business.plan === "free" && (
-            <div className="flex gap-2">
-              <button
-                disabled={checkoutPlan !== null}
-                onClick={() => requestUpgrade("pro")}
-                className="btn-solid px-3.5 py-2 text-xs"
-              >
-                Upgrade to Pro
-              </button>
-              <button
-                disabled={checkoutPlan !== null}
-                onClick={() => requestUpgrade("studio")}
-                className="btn-frame-primary px-3.5 py-2 text-xs"
-              >
-                Studio
-              </button>
-            </div>
+          {business.plan === "free" && !showUpgrade && (
+            <button
+              onClick={() => requestUpgrade()}
+              className="btn-solid px-3.5 py-2 text-xs"
+            >
+              Upgrade to Pro
+            </button>
           )}
         </div>
         {data.usage.limit !== null && (
@@ -348,6 +332,71 @@ function SettingsTab() {
               }`}
               style={{ width: `${usagePercent}%` }}
             />
+          </div>
+        )}
+
+        {/* Upgrade panel */}
+        {showUpgrade && business.plan === "free" && (
+          <div className="mt-4 rounded-xl border border-primary-mid bg-white p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="text-sm font-bold text-foreground">Upgrade to Pro</div>
+              <button
+                onClick={() => setShowUpgrade(false)}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="mb-4 flex items-baseline gap-1.5">
+              <span className="font-display text-2xl font-bold text-primary">
+                {proPrice.symbol}{proPrice.amount}
+              </span>
+              <span className="text-sm text-muted-foreground">/ month · {proPrice.currency}</span>
+              {proPrice.note && (
+                <span className="text-xs text-muted-foreground">({proPrice.note})</span>
+              )}
+            </div>
+
+            <div className="mb-4 space-y-2 text-[13px] text-foreground">
+              {["Unlimited bookings", "Unlimited services", "Custom booking rules", "Priority WhatsApp delivery", "Priority support"].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <span className="font-bold text-success">✓</span> {f}
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-3">
+              {billingConfig?.paypalUrl && billingConfig.paypalUrl !== "https://paypal.me/YOUR_PAYPAL_USERNAME" ? (
+                <a
+                  href={`${billingConfig.paypalUrl}/${proPrice.amount}${proPrice.currency}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-solid flex w-full items-center justify-center gap-2 py-3"
+                  onClick={() => notify("After paying, email us with your PayPal transaction ID — we'll activate Pro within a few hours.", "info")}
+                >
+                  <span className="text-lg">💳</span>
+                  Pay {proPrice.symbol}{proPrice.amount} with PayPal
+                </a>
+              ) : (
+                <div className="rounded-lg border border-border bg-surface px-4 py-3 text-[13px] text-muted-foreground">
+                  Online payment is being set up. Use the contact option below.
+                </div>
+              )}
+
+              <a
+                href={`mailto:${billingConfig?.contactEmail ?? "hello@octolabs.app"}?subject=Randevou Pro upgrade&body=Hi, I'd like to upgrade to Pro. My business: ${business.name}`}
+                className="btn-frame flex w-full items-center justify-center gap-2 py-2.5 text-sm"
+              >
+                ✉ Email us to upgrade manually
+              </a>
+            </div>
+
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              After payment, email{" "}
+              <span className="font-medium">{billingConfig?.contactEmail ?? "hello@octolabs.app"}</span>{" "}
+              with your transaction ID and business name. We activate Pro within a few hours.
+            </p>
           </div>
         )}
       </div>

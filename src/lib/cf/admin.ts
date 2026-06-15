@@ -8,6 +8,7 @@
 
 import { getCFEnv, getD1, d1All, d1First, d1Run, isD1Enabled } from "./db";
 import { getCurrentOwner } from "./auth";
+import { requireSameOriginMutation } from "./api";
 import { getBillingConfig } from "./subscriptions";
 import { sendTemplatedCancellationMessage } from "./messaging";
 import {
@@ -38,6 +39,8 @@ export function isPlatformAdmin(owner: Owner | null | undefined): boolean {
  * Use at the top of every /api/admin/* handler.
  */
 export async function requirePlatformAdmin(request: Request): Promise<Owner | Response> {
+  const csrf = requireSameOriginMutation(request);
+  if (csrf) return csrf;
   const owner = await getCurrentOwner(request);
   if (!owner) {
     return Response.json({ error: "Authentication required." }, { status: 401 });
@@ -205,15 +208,22 @@ export async function listAdminBusinesses(query?: string) {
     booking_limit_monthly: number | null;
     owner_email: string | null;
     booking_count: number;
+    sub_status: string | null;
+    sub_end: string | null;
+    sub_ref: string | null;
   }>(
     db
       .prepare(
         `SELECT biz.id, biz.name, biz.slug, biz.category, biz.city, biz.plan,
                 biz.booking_limit_monthly,
                 o.email owner_email,
-                (SELECT COUNT(*) FROM bookings bk WHERE bk.business_id = biz.id) booking_count
+                (SELECT COUNT(*) FROM bookings bk WHERE bk.business_id = biz.id) booking_count,
+                sub.status sub_status,
+                sub.current_period_end sub_end,
+                sub.payment_reference sub_ref
          FROM businesses biz
          LEFT JOIN owners o ON o.id = biz.owner_id
+         LEFT JOIN subscriptions sub ON sub.business_id = biz.id
          WHERE (? = '%%') OR lower(biz.name) LIKE ? OR lower(biz.slug) LIKE ? OR lower(o.email) LIKE ?
          ORDER BY biz.created_at DESC LIMIT 100`,
       )

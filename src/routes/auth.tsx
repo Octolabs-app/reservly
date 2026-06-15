@@ -17,10 +17,12 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const redirectTo =
+  const SAFE_REDIRECTS = ["/dashboard", "/onboarding"];
+  const rawRedirect =
     typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("redirectTo") || "/dashboard"
-      : "/dashboard";
+      ? (new URLSearchParams(window.location.search).get("redirectTo") ?? "")
+      : "";
+  const redirectTo = SAFE_REDIRECTS.includes(rawRedirect) ? rawRedirect : "/dashboard";
 
   async function submit() {
     setBusy(true);

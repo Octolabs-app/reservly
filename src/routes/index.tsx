@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { BrandMark, SiteHeader } from "@/components/randevou/AppShell";
 import { getSiteUrl } from "@/lib/randevou/env";
+import { getRegionalProPrice, type RegionalPrice } from "@/lib/randevou/pricing";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -45,40 +47,26 @@ const FEATURES = [
   },
 ];
 
-const PRICING = [
-  {
-    name: "Free",
-    price: "$0",
-    sub: "Up to 15 bookings/mo",
-    cta: "Start free",
-    highlight: false,
-    features: ["Booking link", "WhatsApp confirmation", "EN/FR toggle", "Owner dashboard"],
-  },
-  {
-    name: "Pro",
-    price: "$5",
-    sub: "per month",
-    cta: "Start with Pro",
-    highlight: true,
-    features: [
-      "Unlimited bookings",
-      "Up to 5 services",
-      "Booking rules & notice control",
-      "Priority WhatsApp delivery",
-    ],
-  },
-  {
-    name: "Studio",
-    price: "$12",
-    sub: "per month",
-    cta: "Start with Studio",
-    highlight: false,
-    features: ["Everything in Pro", "Unlimited services", "Priority support"],
-  },
+const FREE_FEATURES = [
+  "Booking link",
+  "WhatsApp confirmation",
+  "EN / FR toggle",
+  "Owner dashboard",
+  "Up to 15 bookings / mo",
+];
+
+const PRO_FEATURES = [
+  "Unlimited bookings",
+  "Unlimited services",
+  "Custom booking rules & notice",
+  "Priority WhatsApp delivery",
+  "Priority support",
 ];
 
 function Landing() {
   const siteHost = getSiteUrl().replace(/^https?:\/\//, "");
+  const [proPrice, setProPrice] = useState<RegionalPrice>(getRegionalProPrice());
+  useEffect(() => { setProPrice(getRegionalProPrice()); }, []);
   return (
     <div className="bg-white">
       <SiteHeader />
@@ -178,57 +166,74 @@ function Landing() {
 
         {/* Pricing */}
         <section className="bg-white px-6 py-18">
-          <div className="mx-auto max-w-4xl">
+          <div className="mx-auto max-w-3xl">
             <div className="mb-12 text-center">
               <h2 className="font-display text-3xl text-foreground sm:text-4xl">
                 Simple pricing. No surprises.
               </h2>
               <p className="mt-2 text-[15px] text-muted-foreground">
-                Start free. Upgrade when you need it. Cancel any time.
+                Start free. Upgrade when you're ready. Cancel any time.
               </p>
             </div>
-            <div className="grid items-stretch gap-4 sm:grid-cols-3">
-              {PRICING.map((p) => (
-                <div
-                  key={p.name}
-                  className={`relative rounded-2xl bg-white p-7 shadow-sm ${
-                    p.highlight ? "border-2 border-primary" : "border border-border"
-                  }`}
-                >
-                  {p.highlight && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-0.5 text-[11px] font-bold text-white">
-                      Most popular
-                    </div>
-                  )}
-                  <div className="text-sm font-bold text-muted-foreground">{p.name}</div>
-                  <div className="mt-1 flex items-baseline gap-1">
-                    <span className="font-display text-3xl text-foreground">{p.price}</span>
-                    {p.price !== "$0" && (
-                      <span className="text-[13px] text-muted-foreground">{p.sub}</span>
-                    )}
-                  </div>
-                  {p.price === "$0" && (
-                    <div className="text-[13px] text-muted-foreground">{p.sub}</div>
-                  )}
-                  <div className="my-4 h-px bg-border" />
-                  <div className="space-y-2">
-                    {p.features.map((f) => (
-                      <div key={f} className="flex items-center gap-2 text-[13px] text-foreground">
-                        <span className="font-bold text-success">✓</span> {f}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-6">
-                    <Link
-                      to="/onboarding"
-                      className={`${p.highlight ? "btn-solid" : "btn-frame-primary"} w-full`}
-                    >
-                      {p.cta}
-                    </Link>
-                  </div>
+            <div className="grid items-stretch gap-4 sm:grid-cols-2">
+              {/* Free */}
+              <div className="rounded-2xl border border-border bg-white p-7 shadow-sm">
+                <div className="text-sm font-bold text-muted-foreground">Free</div>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="font-display text-4xl text-foreground">$0</span>
                 </div>
-              ))}
+                <div className="text-[13px] text-muted-foreground">forever</div>
+                <div className="my-4 h-px bg-border" />
+                <div className="space-y-2">
+                  {FREE_FEATURES.map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[13px] text-foreground">
+                      <span className="font-bold text-success">✓</span> {f}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6">
+                  <Link to="/onboarding" className="btn-frame-primary w-full">
+                    Start free
+                  </Link>
+                </div>
+              </div>
+
+              {/* Pro */}
+              <div className="relative rounded-2xl border-2 border-primary bg-white p-7 shadow-sm">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-0.5 text-[11px] font-bold text-white">
+                  Most popular
+                </div>
+                <div className="text-sm font-bold text-muted-foreground">Pro</div>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="font-display text-4xl text-foreground">
+                    {proPrice.symbol}{proPrice.amount}
+                  </span>
+                  <span className="text-[13px] text-muted-foreground">/ mo · {proPrice.currency}</span>
+                </div>
+                {proPrice.note ? (
+                  <div className="text-[11px] text-muted-foreground">{proPrice.note}</div>
+                ) : (
+                  <div className="text-[13px] text-muted-foreground">per month</div>
+                )}
+                <div className="my-4 h-px bg-border" />
+                <div className="space-y-2">
+                  {PRO_FEATURES.map((f) => (
+                    <div key={f} className="flex items-center gap-2 text-[13px] text-foreground">
+                      <span className="font-bold text-success">✓</span> {f}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6">
+                  <Link to="/onboarding" className="btn-solid w-full">
+                    Start with Pro →
+                  </Link>
+                </div>
+              </div>
             </div>
+
+            <p className="mt-5 text-center text-xs text-muted-foreground">
+              Price shown in your local currency · Billed monthly · No contract
+            </p>
           </div>
         </section>
 
@@ -241,6 +246,10 @@ function Landing() {
               <span className="text-xs text-muted-foreground">by Octolabs · Mauritius 🇲🇺</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Link to="/help" className="hover:text-foreground">
+                Help
+              </Link>
+              <span>·</span>
               <Link to="/privacy" className="hover:text-foreground">
                 Privacy
               </Link>

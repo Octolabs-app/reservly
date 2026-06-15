@@ -25,8 +25,8 @@ function TermsPage() {
             compliance.
           </p>
           <p>
-            The Free plan includes 15 bookings per calendar month. Pro and Studio plans are treated
-            as unlimited inside the application.
+            The Free plan includes 15 bookings per calendar month. The Pro plan is treated as
+            unlimited inside the application.
           </p>
           <p>
             WhatsApp delivery and card payments depend on third-party providers (Twilio and Stripe).

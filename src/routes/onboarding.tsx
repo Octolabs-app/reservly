@@ -79,7 +79,7 @@ function newServiceDraft(): ServiceDraft {
 
 function OnboardingPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [needsAuth, setNeedsAuth] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -213,25 +213,29 @@ function OnboardingPage() {
           <div className="bg-primary px-6 pb-4 pt-5">
             <div className="flex items-center justify-between">
               <div className="text-xs text-white/70">
-                Step {step} of 3 — {stepNames[step - 1]}
+                {step === 0 ? "Welcome to Randevou" : `Step ${step} of 3 — ${stepNames[step - 1]}`}
               </div>
               <Link to="/" className="text-xs text-white/50 hover:text-white">
                 Cancel
               </Link>
             </div>
-            <div className="mt-3 flex gap-1.5">
-              {[1, 2, 3].map((idx) => (
-                <div
-                  key={idx}
-                  className={`h-1 flex-1 rounded-full transition-colors ${
-                    idx <= step ? "bg-white" : "bg-white/25"
-                  }`}
-                />
-              ))}
-            </div>
+            {step > 0 && (
+              <div className="mt-3 flex gap-1.5">
+                {[1, 2, 3].map((idx) => (
+                  <div
+                    key={idx}
+                    className={`h-1 flex-1 rounded-full transition-colors ${
+                      idx <= step ? "bg-white" : "bg-white/25"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="p-6 sm:p-7">
+            {step === 0 && <WelcomeStep onStart={() => setStep(1)} />}
+
             {step === 1 && (
               <div className="space-y-5">
                 <header>
@@ -562,25 +566,27 @@ function OnboardingPage() {
               </div>
             )}
 
-            <div className="mt-7 flex items-center justify-between gap-3">
-              {step > 1 ? (
-                <button onClick={() => setStep(step - 1)} className="btn-frame">
-                  ← Back
+            {step > 0 && (
+              <div className="mt-7 flex items-center justify-between gap-3">
+                {step > 1 ? (
+                  <button onClick={() => setStep(step - 1)} className="btn-frame">
+                    ← Back
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <button
+                  disabled={submitting || (step === 1 ? !canNext1 : step === 2 ? !canNext2 : false)}
+                  onClick={() => {
+                    if (step < 3) setStep(step + 1);
+                    else void finish();
+                  }}
+                  className={step === 3 ? "btn-accent" : "btn-solid"}
+                >
+                  {submitting ? "Saving…" : step === 3 ? "Go live 🚀" : "Continue →"}
                 </button>
-              ) : (
-                <span />
-              )}
-              <button
-                disabled={submitting || (step === 1 ? !canNext1 : step === 2 ? !canNext2 : false)}
-                onClick={() => {
-                  if (step < 3) setStep(step + 1);
-                  else void finish();
-                }}
-                className={step === 3 ? "btn-accent" : "btn-solid"}
-              >
-                {submitting ? "Saving…" : step === 3 ? "Go live 🚀" : "Continue →"}
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         </Panel>
       </Page>
@@ -597,6 +603,83 @@ function patchService(
   const next = [...services];
   next[index] = { ...next[index], ...patch };
   setServices(next);
+}
+
+function WelcomeStep({ onStart }: { onStart: () => void }) {
+  return (
+    <div>
+      <div className="mb-6 text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-soft text-3xl">
+          📲
+        </div>
+        <h1 className="font-display text-xl font-bold text-foreground">
+          Your booking link, live in 5 minutes
+        </h1>
+        <p className="mx-auto mt-2 max-w-xs text-[13px] leading-relaxed text-muted-foreground">
+          Customers tap your link, pick a slot, and get a WhatsApp confirmation. No app download
+          needed — for them or for you.
+        </p>
+      </div>
+
+      <div className="mb-6 space-y-3">
+        {[
+          {
+            icon: "🔗",
+            title: "Share one link, anywhere",
+            desc: "Post it on WhatsApp, Instagram, or a business card. Customers book 24/7 without calling you.",
+          },
+          {
+            icon: "💬",
+            title: "WhatsApp confirms instantly",
+            desc: "Every booking sends a confirmation to you and your customer automatically — no manual follow-up.",
+          },
+          {
+            icon: "🗓️",
+            title: "You stay in full control",
+            desc: "Set your hours, services, and notice period. Block days off any time from your phone.",
+          },
+        ].map((b) => (
+          <div
+            key={b.title}
+            className="flex items-start gap-3 rounded-xl border border-border bg-surface p-4"
+          >
+            <span className="mt-0.5 text-xl">{b.icon}</span>
+            <div>
+              <div className="text-sm font-semibold text-foreground">{b.title}</div>
+              <div className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">{b.desc}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mb-6 rounded-lg border border-primary-mid bg-primary-soft px-4 py-3">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
+          You'll set up in 3 quick steps
+        </div>
+        <div className="space-y-1.5">
+          {[
+            "Your business — name, category and city",
+            "Your services — what you offer and prices",
+            "Your hours — when customers can book",
+          ].map((s, i) => (
+            <div key={s} className="flex items-center gap-2 text-[12px] text-foreground">
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">
+                {i + 1}
+              </span>
+              {s}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button onClick={onStart} className="btn-solid w-full py-3 text-[15px]">
+        Set up my booking page →
+      </button>
+      <div className="mt-2.5 text-center text-xs text-muted-foreground">
+        Free plan · No credit card · Takes about 5 minutes
+      </div>
+    </div>
+  );
 }
 
 function OnboardingSkeleton() {

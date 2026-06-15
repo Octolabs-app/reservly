@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -35,6 +36,7 @@ import { Route as ApiDashboardCreateBookingRouteImport } from './routes/api.dash
 import { Route as ApiDashboardBusinessRouteImport } from './routes/api.dashboard.business'
 import { Route as ApiDashboardBookingActionRouteImport } from './routes/api.dashboard.booking-action'
 import { Route as ApiDashboardAvailabilityRouteImport } from './routes/api.dashboard.availability'
+import { Route as ApiBillingConfigRouteImport } from './routes/api.billing.config'
 import { Route as ApiAuthSignupRouteImport } from './routes/api.auth.signup'
 import { Route as ApiAuthSignoutRouteImport } from './routes/api.auth.signout'
 import { Route as ApiAuthSigninRouteImport } from './routes/api.auth.signin'
@@ -61,6 +63,11 @@ const PrivacyRoute = PrivacyRouteImport.update({
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -181,6 +188,11 @@ const ApiDashboardAvailabilityRoute =
     path: '/api/dashboard/availability',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiBillingConfigRoute = ApiBillingConfigRouteImport.update({
+  id: '/api/billing/config',
+  path: '/api/billing/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSignupRoute = ApiAuthSignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -247,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/help': typeof HelpRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
@@ -267,6 +280,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/billing/config': typeof ApiBillingConfigRoute
   '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
   '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
   '/api/dashboard/business': typeof ApiDashboardBusinessRoute
@@ -286,6 +300,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/help': typeof HelpRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
@@ -306,6 +321,7 @@ export interface FileRoutesByTo {
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/billing/config': typeof ApiBillingConfigRoute
   '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
   '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
   '/api/dashboard/business': typeof ApiDashboardBusinessRoute
@@ -327,6 +343,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/help': typeof HelpRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
@@ -347,6 +364,7 @@ export interface FileRoutesById {
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/billing/config': typeof ApiBillingConfigRoute
   '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
   '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
   '/api/dashboard/business': typeof ApiDashboardBusinessRoute
@@ -369,6 +387,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/dashboard'
+    | '/help'
     | '/onboarding'
     | '/privacy'
     | '/terms'
@@ -389,6 +408,7 @@ export interface FileRouteTypes {
     | '/api/auth/signin'
     | '/api/auth/signout'
     | '/api/auth/signup'
+    | '/api/billing/config'
     | '/api/dashboard/availability'
     | '/api/dashboard/booking-action'
     | '/api/dashboard/business'
@@ -408,6 +428,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/auth'
+    | '/help'
     | '/onboarding'
     | '/privacy'
     | '/terms'
@@ -428,6 +449,7 @@ export interface FileRouteTypes {
     | '/api/auth/signin'
     | '/api/auth/signout'
     | '/api/auth/signup'
+    | '/api/billing/config'
     | '/api/dashboard/availability'
     | '/api/dashboard/booking-action'
     | '/api/dashboard/business'
@@ -448,6 +470,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/dashboard'
+    | '/help'
     | '/onboarding'
     | '/privacy'
     | '/terms'
@@ -468,6 +491,7 @@ export interface FileRouteTypes {
     | '/api/auth/signin'
     | '/api/auth/signout'
     | '/api/auth/signup'
+    | '/api/billing/config'
     | '/api/dashboard/availability'
     | '/api/dashboard/booking-action'
     | '/api/dashboard/business'
@@ -489,6 +513,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  HelpRoute: typeof HelpRoute
   OnboardingRoute: typeof OnboardingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
@@ -501,6 +526,7 @@ export interface RootRouteChildren {
   ApiAdminOverviewRoute: typeof ApiAdminOverviewRoute
   ApiAdminOwnersRoute: typeof ApiAdminOwnersRoute
   ApiAdminSystemRoute: typeof ApiAdminSystemRoute
+  ApiBillingConfigRoute: typeof ApiBillingConfigRoute
   ApiDashboardAvailabilityRoute: typeof ApiDashboardAvailabilityRoute
   ApiDashboardBookingActionRoute: typeof ApiDashboardBookingActionRoute
   ApiDashboardBusinessRoute: typeof ApiDashboardBusinessRoute
@@ -538,6 +564,13 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/onboarding'
       preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -701,6 +734,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDashboardAvailabilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/config': {
+      id: '/api/billing/config'
+      path: '/api/billing/config'
+      fullPath: '/api/billing/config'
+      preLoaderRoute: typeof ApiBillingConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/signup': {
       id: '/api/auth/signup'
       path: '/signup'
@@ -828,6 +868,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  HelpRoute: HelpRoute,
   OnboardingRoute: OnboardingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
@@ -840,6 +881,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminOverviewRoute: ApiAdminOverviewRoute,
   ApiAdminOwnersRoute: ApiAdminOwnersRoute,
   ApiAdminSystemRoute: ApiAdminSystemRoute,
+  ApiBillingConfigRoute: ApiBillingConfigRoute,
   ApiDashboardAvailabilityRoute: ApiDashboardAvailabilityRoute,
   ApiDashboardBookingActionRoute: ApiDashboardBookingActionRoute,
   ApiDashboardBusinessRoute: ApiDashboardBusinessRoute,

@@ -70,6 +70,8 @@ export type CloudflareEnv = {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_PRO_MONTHLY?: string;
   STRIPE_PRICE_STUDIO_MONTHLY?: string;
+  // Manual payment
+  PAYPAL_ME_URL?: string;
 };
 
 export type KVNamespace = {

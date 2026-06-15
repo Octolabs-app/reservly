@@ -114,25 +114,33 @@ export async function recordManualPayment(input: {
   provider?: Extract<BillingProvider, "manual" | "paypal_manual">;
   note?: string | null;
   reference?: string | null;
+  /** Days from today the subscription is valid for (default 30). Pass 0 for indefinite (null end). */
+  periodDays?: number | null;
 }): Promise<Subscription> {
   const db = getD1();
   if (!db) throw new Error("Database unavailable.");
   const provider = input.provider ?? "paypal_manual";
   const status: SubscriptionStatus = input.plan === "free" ? "canceled" : "manual";
+  const days = input.periodDays == null ? 30 : input.periodDays;
+  const periodEnd = days > 0
+    ? new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 19).replace("T", " ")
+    : null;
 
   await d1Run(
     db
       .prepare(
         `
       INSERT INTO subscriptions
-        (id, business_id, plan, status, provider, payment_note, payment_reference, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        (id, business_id, plan, status, provider, payment_note, payment_reference,
+         current_period_end, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       ON CONFLICT(business_id) DO UPDATE SET
         plan = excluded.plan,
         status = excluded.status,
         provider = excluded.provider,
         payment_note = excluded.payment_note,
         payment_reference = excluded.payment_reference,
+        current_period_end = excluded.current_period_end,
         updated_at = datetime('now')
     `,
       )
@@ -144,6 +152,7 @@ export async function recordManualPayment(input: {
         provider,
         input.note ?? null,
         input.reference ?? null,
+        periodEnd,
       ),
   );
 

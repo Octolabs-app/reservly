@@ -342,6 +342,11 @@ export async function getPublicBusinessBySlug(slug: string): Promise<PublicBusin
 
   const business = mapBusiness(bizRow);
 
+  // CA-06: bound booking reads to a rolling window — 35 days back (full
+  // current-month coverage) to 95 days forward (max advance window + buffer).
+  const windowStart = new Date(Date.now() - 35 * 86_400_000).toISOString();
+  const windowEnd = new Date(Date.now() + 95 * 86_400_000).toISOString();
+
   const [serviceRows, availRows, bookingRows] = await Promise.all([
     d1All<ServiceRow>(
       db
@@ -356,9 +361,9 @@ export async function getPublicBusinessBySlug(slug: string): Promise<PublicBusin
     d1All<BookingRow>(
       db
         .prepare(
-          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')",
+          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?",
         )
-        .bind(business.id),
+        .bind(business.id, windowStart, windowEnd),
     ),
   ]);
 
@@ -581,6 +586,9 @@ export async function getAvailableSlots(
 
   const db = getD1()!;
 
+  const slotWindowStart = new Date(Date.now() - 35 * 86_400_000).toISOString();
+  const slotWindowEnd = new Date(Date.now() + 95 * 86_400_000).toISOString();
+
   const [serviceRow, availRows, bookingRows, bizRow] = await Promise.all([
     d1First<ServiceRow>(
       db.prepare("SELECT * FROM services WHERE id = ? AND active = 1").bind(serviceId),
@@ -591,9 +599,9 @@ export async function getAvailableSlots(
     d1All<BookingRow>(
       db
         .prepare(
-          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')",
+          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?",
         )
-        .bind(businessId),
+        .bind(businessId, slotWindowStart, slotWindowEnd),
     ),
     d1First<BusinessRow>(db.prepare("SELECT * FROM businesses WHERE id = ?").bind(businessId)),
   ]);
@@ -678,8 +686,10 @@ async function generateUniqueBookingRef(db: D1Database): Promise<string> {
     );
     if (!existing) return ref;
   }
-  // Astronomically unlikely; fall back to a longer unique-ish suffix.
-  return `${generateBookingRef()}${Math.floor(Math.random() * 90 + 10)}`;
+  // Astronomically unlikely after 6 tries — use a crypto-safe numeric suffix.
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return `${generateBookingRef()}${(arr[0] % 90) + 10}`;
 }
 
 function validateBookingInput(input: BookingInput, options: { phoneRequired: boolean }) {
@@ -790,7 +800,7 @@ export async function createBooking(
     }
   }
 
-  // Check overlap
+  // Compute endAt first (needed for the atomic INSERT).
   const startMs = new Date(input.startAt).getTime();
   let endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
   if (service.allDay) {
@@ -805,29 +815,26 @@ export async function createBooking(
       endAt = isoFromMauritiusLocal(bookingDate, dayRow.closes_at.slice(0, 5));
     }
   }
-  const overlap = await d1First(
-    db
-      .prepare(
-        `
-      SELECT id FROM bookings
-      WHERE business_id = ? AND status IN ('pending','confirmed')
-      AND start_at < ? AND end_at > ?
-    `,
-      )
-      .bind(input.businessId, endAt, input.startAt),
-  );
-  if (overlap) throw new Error("That time has just been taken. Pick another slot.");
 
   const id = crypto.randomUUID();
   const bookingRef = await generateUniqueBookingRef(db);
-  await d1Run(
-    db
+
+  // CA-03: combine overlap check and INSERT into one atomic SQLite statement so
+  // two concurrent requests for the same slot can never both succeed.
+  let insertResult: { success: boolean; meta: { changes?: number } };
+  try {
+    insertResult = await db
       .prepare(
         `
       INSERT INTO bookings
         (id, business_id, service_id, customer_name, customer_phone,
          customer_language, start_at, end_at, status, source, booking_ref, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1 FROM bookings
+        WHERE business_id = ? AND status IN ('pending','confirmed')
+        AND start_at < ? AND end_at > ?
+      )
     `,
       )
       .bind(
@@ -842,8 +849,19 @@ export async function createBooking(
         source,
         bookingRef,
         input.notes ?? null,
-      ),
-  );
+        // WHERE NOT EXISTS params:
+        input.businessId,
+        endAt,
+        input.startAt,
+      )
+      .run();
+  } catch (error) {
+    console.error("[createBooking INSERT]", error);
+    throw new Error("Booking could not be saved. Please try again.");
+  }
+  if (!insertResult.success || !insertResult.meta?.changes) {
+    throw new Error("That time has just been taken. Pick another slot.");
+  }
 
   const booking: Booking = {
     id,

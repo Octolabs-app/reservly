@@ -31,6 +31,12 @@ export const Route = createFileRoute("/api/auth/signup")({
             { status: 400 },
           );
         }
+        if (new TextEncoder().encode(password).length > 72) {
+          return Response.json(
+            { error: "Password is too long (max 72 characters)." },
+            { status: 400 },
+          );
+        }
         try {
           const { owner, sessionCookie } = await signUpOwner(email, password, name);
           return Response.json({ owner }, { headers: { "Set-Cookie": sessionCookie } });

@@ -20,6 +20,7 @@ type Body =
       provider?: "manual" | "paypal_manual";
       note?: string;
       reference?: string;
+      periodDays?: number | null;
     };
 
 export const Route = createFileRoute("/api/admin/businesses")({
@@ -53,6 +54,7 @@ export const Route = createFileRoute("/api/admin/businesses")({
               provider: body.provider ?? "paypal_manual",
               note: body.note ?? null,
               reference: body.reference ?? null,
+              periodDays: body.periodDays ?? 30,
             });
             await recordAdminAudit({
               adminOwnerId: admin.id,

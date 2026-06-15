@@ -146,6 +146,11 @@ export async function signInOwner(
   }
 
   const db = getD1()!;
+  // bcrypt silently truncates at 72 UTF-8 bytes — reject here so two passwords
+  // that differ only past byte 72 can never match the same hash.
+  if (new TextEncoder().encode(password).length > 72) {
+    throw new Error("Invalid email or password.");
+  }
   const ownerRow = await d1First<OwnerRow>(
     db
       .prepare("SELECT id, email, full_name, password_hash FROM owners WHERE email = ?")
