@@ -36,6 +36,7 @@ import {
 import { generateUniqueSlug } from "@/lib/randevou/slug";
 import {
   calculateMonthlyUsage,
+  addDaysToDateInput,
   formatDateLabel,
   formatTimeLabel,
   generateSlots,
@@ -62,6 +63,7 @@ import {
   type DashboardData,
   type Owner,
   type Plan,
+  type PlanUsage,
   type PublicBusiness,
   type Service,
   type ServiceInput,
@@ -185,6 +187,24 @@ type BookingRow = {
   business_name?: string;
   business_slug?: string;
 };
+
+function mauritiusDayBounds(date: string): { start: string; end: string } {
+  return {
+    start: isoFromMauritiusLocal(date, "00:00"),
+    end: isoFromMauritiusLocal(addDaysToDateInput(date, 1), "00:00"),
+  };
+}
+
+function usageFromCount(plan: Plan, limit: number | null, used: number): PlanUsage {
+  const effectiveLimit = plan === "free" ? (limit ?? FREE_BOOKING_LIMIT) : null;
+  return {
+    plan,
+    used,
+    limit: effectiveLimit,
+    nearLimit: effectiveLimit === null ? false : used >= Math.max(1, effectiveLimit - 3),
+    full: effectiveLimit === null ? false : used >= effectiveLimit,
+  };
+}
 
 // ─── Map helpers ─────────────────────────────────────────────────────────────
 
@@ -341,13 +361,9 @@ export async function getPublicBusinessBySlug(slug: string): Promise<PublicBusin
   if (!bizRow) return null;
 
   const business = mapBusiness(bizRow);
+  const currentMonth = mauritiusMonthBounds(new Date().toISOString());
 
-  // CA-06: bound booking reads to a rolling window — 35 days back (full
-  // current-month coverage) to 95 days forward (max advance window + buffer).
-  const windowStart = new Date(Date.now() - 35 * 86_400_000).toISOString();
-  const windowEnd = new Date(Date.now() + 95 * 86_400_000).toISOString();
-
-  const [serviceRows, availRows, bookingRows] = await Promise.all([
+  const [serviceRows, availRows, usageRow] = await Promise.all([
     d1All<ServiceRow>(
       db
         .prepare("SELECT * FROM services WHERE business_id = ? AND active = 1 ORDER BY created_at")
@@ -358,21 +374,22 @@ export async function getPublicBusinessBySlug(slug: string): Promise<PublicBusin
         .prepare("SELECT * FROM availability WHERE business_id = ? ORDER BY day_of_week")
         .bind(business.id),
     ),
-    d1All<BookingRow>(
+    d1First<{ count: number }>(
       db
         .prepare(
-          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?",
+          `SELECT COUNT(*) count FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at >= ? AND start_at < ?`,
         )
-        .bind(business.id, windowStart, windowEnd),
+        .bind(business.id, currentMonth.start, currentMonth.end),
     ),
   ]);
 
-  const bookings = bookingRows.map(mapBooking);
   return {
     business,
     services: serviceRows.map(mapService),
     availability: availRows.map(mapAvailability),
-    usage: calculateMonthlyUsage(bookings, business.plan, business.bookingLimitMonthly),
+    usage: usageFromCount(business.plan, business.bookingLimitMonthly, usageRow?.count ?? 0),
   };
 }
 
@@ -585,11 +602,10 @@ export async function getAvailableSlots(
   }
 
   const db = getD1()!;
+  const dayBounds = mauritiusDayBounds(date);
+  const monthBounds = mauritiusMonthBounds(isoFromMauritiusLocal(date, "12:00"));
 
-  const slotWindowStart = new Date(Date.now() - 35 * 86_400_000).toISOString();
-  const slotWindowEnd = new Date(Date.now() + 95 * 86_400_000).toISOString();
-
-  const [serviceRow, availRows, bookingRows, bizRow] = await Promise.all([
+  const [serviceRow, availRows, bookingRows, bizRow, usageRow] = await Promise.all([
     d1First<ServiceRow>(
       db.prepare("SELECT * FROM services WHERE id = ? AND active = 1").bind(serviceId),
     ),
@@ -599,11 +615,22 @@ export async function getAvailableSlots(
     d1All<BookingRow>(
       db
         .prepare(
-          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed') AND start_at >= ? AND start_at < ?",
+          `SELECT * FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at < ? AND end_at > ?`,
         )
-        .bind(businessId, slotWindowStart, slotWindowEnd),
+        .bind(businessId, dayBounds.end, dayBounds.start),
     ),
     d1First<BusinessRow>(db.prepare("SELECT * FROM businesses WHERE id = ?").bind(businessId)),
+    d1First<{ count: number }>(
+      db
+        .prepare(
+          `SELECT COUNT(*) count FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at >= ? AND start_at < ?`,
+        )
+        .bind(businessId, monthBounds.start, monthBounds.end),
+    ),
   ]);
 
   if (!serviceRow || !bizRow) return [];
@@ -611,14 +638,10 @@ export async function getAvailableSlots(
   const business = mapBusiness(bizRow);
   const service = mapService(serviceRow);
   const bookings = bookingRows.map(mapBooking);
-  // Judge "month full" against the month of the REQUESTED date (Mauritius
-  // calendar), not the current month — next-month dates must stay bookable
-  // when this month's quota is used up.
-  const monthlyFull = calculateMonthlyUsage(
-    bookings,
+  const monthlyFull = usageFromCount(
     business.plan,
     business.bookingLimitMonthly,
-    new Date(isoFromMauritiusLocal(date, "12:00")),
+    usageRow?.count ?? 0,
   ).full;
 
   return generateSlots({
@@ -646,23 +669,35 @@ async function isValidAvailableSlot(
   startAt: string,
 ): Promise<boolean> {
   const date = mauritiusDateFromIso(startAt);
-  const [availRows, bookingRows] = await Promise.all([
+  const dayBounds = mauritiusDayBounds(date);
+  const monthBounds = mauritiusMonthBounds(isoFromMauritiusLocal(date, "12:00"));
+  const [availRows, bookingRows, usageRow] = await Promise.all([
     d1All<AvailabilityRow>(
       db.prepare("SELECT * FROM availability WHERE business_id = ?").bind(business.id),
     ),
     d1All<BookingRow>(
       db
         .prepare(
-          "SELECT * FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')",
+          `SELECT * FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at < ? AND end_at > ?`,
         )
-        .bind(business.id),
+        .bind(business.id, dayBounds.end, dayBounds.start),
+    ),
+    d1First<{ count: number }>(
+      db
+        .prepare(
+          `SELECT COUNT(*) count FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at >= ? AND start_at < ?`,
+        )
+        .bind(business.id, monthBounds.start, monthBounds.end),
     ),
   ]);
-  const monthlyFull = calculateMonthlyUsage(
-    bookingRows.map(mapBooking),
+  const monthlyFull = usageFromCount(
     business.plan,
     business.bookingLimitMonthly,
-    new Date(isoFromMauritiusLocal(date, "12:00")),
+    usageRow?.count ?? 0,
   ).full;
   const slots = generateSlots({
     date,
@@ -677,20 +712,9 @@ async function isValidAvailableSlot(
   return slots.some((slot) => slot.available && slot.startAt === startAt);
 }
 
-/** Generate a booking reference (e.g. RDV-8K2Q) that isn't already in use. */
-async function generateUniqueBookingRef(db: D1Database): Promise<string> {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const ref = generateBookingRef();
-    const existing = await d1First<{ id: string }>(
-      db.prepare("SELECT id FROM bookings WHERE booking_ref = ?").bind(ref),
-    );
-    if (!existing) return ref;
-  }
-  // Astronomically unlikely after 6 tries — use a crypto-safe numeric suffix.
-  const arr = new Uint32Array(1);
-  crypto.getRandomValues(arr);
-  return `${generateBookingRef()}${(arr[0] % 90) + 10}`;
-}
+// booking_ref uniqueness is enforced by the DB UNIQUE partial index
+// (migration 0005). The INSERT loop retries on collision.
+
 
 function validateBookingInput(input: BookingInput, options: { phoneRequired: boolean }) {
   const name = input.customerName?.trim() ?? "";
@@ -780,27 +804,9 @@ export async function createBooking(
       }
     }
 
-    if (business.plan === "free" && business.bookingLimitMonthly) {
-      // Same Mauritius-month bucket the dashboard and slot grid use.
-      const { start: monthStart, end: monthEnd } = mauritiusMonthBounds(input.startAt);
-      const countRow = await d1First<{ count: number }>(
-        db
-          .prepare(
-            `
-          SELECT COUNT(*) as count FROM bookings
-          WHERE business_id = ? AND status IN ('pending','confirmed')
-          AND start_at >= ? AND start_at < ?
-        `,
-          )
-          .bind(input.businessId, monthStart, monthEnd),
-      );
-      if ((countRow?.count ?? 0) >= business.bookingLimitMonthly) {
-        throw new Error("Online booking is full for this month.");
-      }
-    }
   }
 
-  // Compute endAt first (needed for the atomic INSERT).
+  // Compute the end time before the atomic final overlap guard below.
   const startMs = new Date(input.startAt).getTime();
   let endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
   if (service.allDay) {
@@ -816,51 +822,84 @@ export async function createBooking(
     }
   }
 
-  const id = crypto.randomUUID();
-  const bookingRef = await generateUniqueBookingRef(db);
+  // Monthly-limit params folded into the atomic INSERT guard.
+  // skipLimitCheck = 1 short-circuits the subquery for non-free or unlimited plans.
+  const { start: monthStart, end: monthEnd } = mauritiusMonthBounds(input.startAt);
+  const skipLimitCheck = !business || business.plan !== "free" || !business.bookingLimitMonthly ? 1 : 0;
+  const limit = business?.bookingLimitMonthly ?? FREE_BOOKING_LIMIT;
 
-  // CA-03: combine overlap check and INSERT into one atomic SQLite statement so
-  // two concurrent requests for the same slot can never both succeed.
-  let insertResult: { success: boolean; meta: { changes?: number } };
-  try {
-    insertResult = await db
-      .prepare(
-        `
-      INSERT INTO bookings
-        (id, business_id, service_id, customer_name, customer_phone,
-         customer_language, start_at, end_at, status, source, booking_ref, notes)
-      SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?
-      WHERE NOT EXISTS (
-        SELECT 1 FROM bookings
-        WHERE business_id = ? AND status IN ('pending','confirmed')
-        AND start_at < ? AND end_at > ?
-      )
-    `,
-      )
-      .bind(
-        id,
-        input.businessId,
-        input.serviceId,
-        clean.name,
-        clean.phone,
-        clean.language,
-        input.startAt,
-        endAt,
-        source,
-        bookingRef,
-        input.notes ?? null,
-        // WHERE NOT EXISTS params:
-        input.businessId,
-        endAt,
-        input.startAt,
-      )
-      .run();
-  } catch (error) {
-    console.error("[createBooking INSERT]", error);
-    throw new Error("Booking could not be saved. Please try again.");
+  const id = crypto.randomUUID();
+  let insertChanges = 0;
+  let insertOk = false;
+  let bookingRef = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    bookingRef = generateBookingRef();
+    try {
+      const r = await db
+        .prepare(
+          `
+          INSERT INTO bookings
+            (id, business_id, service_id, customer_name, customer_phone,
+             customer_language, start_at, end_at, status, source, booking_ref, notes)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM bookings
+            WHERE business_id = ? AND status IN ('pending','confirmed')
+            AND start_at < ? AND end_at > ?
+          )
+          AND (
+            ?
+            OR (SELECT COUNT(*) FROM bookings
+                WHERE business_id = ? AND status IN ('pending','confirmed')
+                AND start_at >= ? AND start_at < ?) < ?
+          )
+        `,
+        )
+        .bind(
+          id,
+          input.businessId,
+          input.serviceId,
+          clean.name,
+          clean.phone,
+          clean.language,
+          input.startAt,
+          endAt,
+          source,
+          bookingRef,
+          input.notes ?? null,
+          input.businessId,
+          endAt,
+          input.startAt,
+          skipLimitCheck,
+          input.businessId,
+          monthStart,
+          monthEnd,
+          limit,
+        )
+        .run();
+      insertOk = r.success;
+      insertChanges = Number(r.meta?.changes ?? 0);
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/UNIQUE.*booking_ref/i.test(msg) && attempt < 4) continue;
+      throw err;
+    }
   }
-  if (!insertResult.success || !insertResult.meta?.changes) {
-    throw new Error("That time has just been taken. Pick another slot.");
+
+  if (!insertOk) throw new Error("Something went wrong. Please try again.");
+  if (insertChanges < 1) {
+    // Distinguish overlap vs monthly-limit so the customer gets the right message.
+    const overlap = await d1First<{ id: string }>(
+      db
+        .prepare(
+          `SELECT id FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at < ? AND end_at > ? LIMIT 1`,
+        )
+        .bind(input.businessId, endAt, input.startAt),
+    );
+    if (overlap) throw new Error("That time has just been taken. Pick another slot.");
+    throw new Error("Online booking is full for this month.");
   }
 
   const booking: Booking = {
@@ -938,7 +977,7 @@ export async function createOwnerBooking(input: BookingInput, ownerId: string): 
   return createBooking(input, { source: "dashboard", skipBookingRules: true });
 }
 
-/** Ownership guard for routes outside this module (e.g. Stripe checkout). */
+/** Ownership guard for routes outside this module. */
 export async function assertBusinessOwnership(businessId: string, ownerId: string): Promise<void> {
   if (!isD1Enabled()) return;
   await ensureBusinessOwner(getD1()!, businessId, ownerId);

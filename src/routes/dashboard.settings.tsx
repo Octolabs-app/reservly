@@ -6,7 +6,9 @@ import {
   createService,
   deleteAccount,
   deleteService,
+  disconnectGoogleAccount,
   getDashboardData,
+  setPassword,
   updateAvailability,
   updateBusiness,
   updateService,
@@ -72,6 +74,9 @@ function SettingsTab() {
   const [messageTone, setMessageTone] = useState<Tone>("success");
   const [removeTarget, setRemoveTarget] = useState<Service | null>(null);
   const [showDelete, setShowDelete] = useState(false);
+  const [showSetPw, setShowSetPw] = useState(false);
+  const [newPw, setNewPw] = useState("");
+  const [settingPw, setSettingPw] = useState(false);
 
   async function refresh() {
     setLoadError(null);
@@ -246,6 +251,36 @@ function SettingsTab() {
     } catch (err) {
       setShowDelete(false);
       failMessage(err, "Account deletion failed — contact support.");
+    }
+  }
+
+  async function disconnectGoogle() {
+    try {
+      await disconnectGoogleAccount();
+      notify("Google account disconnected");
+      await refresh();
+    } catch (err) {
+      failMessage(err, "Google account could not be disconnected.");
+    }
+  }
+
+  async function handleSetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPw.length < 8) {
+      notify("Password must be at least 8 characters.", "error");
+      return;
+    }
+    setSettingPw(true);
+    try {
+      await setPassword(newPw);
+      setNewPw("");
+      setShowSetPw(false);
+      notify("✓ Password set — you can now sign in with email + password.");
+      await refresh();
+    } catch (err) {
+      failMessage(err, "Password could not be set — try again.");
+    } finally {
+      setSettingPw(false);
     }
   }
 
@@ -830,6 +865,100 @@ function SettingsTab() {
                 )}
               </div>
             ))}
+        </div>
+      </Panel>
+
+      {/* Sign-in & security */}
+      <Panel className="p-5">
+        <SectionHeader title="Sign-in & security" sub="Google login and password settings." />
+
+        {/* Google row */}
+        <div className="mb-4 rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-bold text-foreground">Google account</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {data.owner?.googleLinked
+                  ? `Connected${data.owner.googleEmail ? ` as ${data.owner.googleEmail}` : ""}`
+                  : "Use Google for faster sign-in without changing billing."}
+              </div>
+            </div>
+            {data.owner?.googleLinked ? (
+              data.owner.passwordLoginEnabled ? (
+                <button
+                  onClick={() => void disconnectGoogle()}
+                  className="btn-frame px-3 py-2 text-xs"
+                >
+                  Disconnect
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowSetPw(true)}
+                  className="btn-frame px-3 py-2 text-xs"
+                  title="Set an email/password login first, then you can disconnect Google"
+                >
+                  Set password to disconnect
+                </button>
+              )
+            ) : (
+              <a
+                href="/api/auth/google/start?mode=link&redirectTo=/dashboard/settings"
+                className="btn-frame-primary px-3 py-2 text-xs"
+              >
+                Connect Google
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Password row */}
+        <div className="rounded-xl border border-border bg-surface px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[13px] font-bold text-foreground">Email / password</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {data.owner?.passwordLoginEnabled
+                  ? "Password login is active. You can update it below."
+                  : "No password set — you sign in with Google only."}
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSetPw((v) => !v)}
+              className="btn-frame px-3 py-2 text-xs"
+            >
+              {data.owner?.passwordLoginEnabled ? "Change password" : "Set password"}
+            </button>
+          </div>
+          {showSetPw && (
+            <form onSubmit={(e) => void handleSetPassword(e)} className="mt-4 flex flex-col gap-3">
+              <input
+                type="password"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                placeholder="New password (min 8 characters)"
+                minLength={8}
+                required
+                autoFocus
+                className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground placeholder-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={settingPw}
+                  className="btn-solid px-4 py-2 text-sm disabled:opacity-60"
+                >
+                  {settingPw ? "Saving…" : "Save password"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSetPw(false); setNewPw(""); }}
+                  className="btn-frame px-4 py-2 text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </Panel>
 

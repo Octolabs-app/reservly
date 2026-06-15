@@ -125,6 +125,20 @@ export function deleteAccount(): Promise<void> {
   });
 }
 
+export function disconnectGoogleAccount(): Promise<void> {
+  return api("/api/auth/google/disconnect", {
+    method: "POST",
+    body: jsonBody({}),
+  });
+}
+
+export function setPassword(newPassword: string): Promise<void> {
+  return api("/api/auth/set-password", {
+    method: "POST",
+    body: jsonBody({ newPassword }),
+  });
+}
+
 export function cancelBooking(id: string): Promise<Booking> {
   return api("/api/dashboard/booking-action", {
     method: "POST",

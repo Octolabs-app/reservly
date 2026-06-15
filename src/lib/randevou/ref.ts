@@ -6,7 +6,7 @@
 
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const PREFIX = "RDV";
-const BODY_LEN = 4;
+const BODY_LEN = 5;
 
 /** Generate a single candidate reference like "RDV-8K2Q". */
 export function generateBookingRef(): string {

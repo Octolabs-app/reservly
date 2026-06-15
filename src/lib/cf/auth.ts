@@ -16,11 +16,31 @@ import type { Owner } from "@/lib/randevou/types";
 const SESSION_COOKIE = "rzv_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 const KV_TTL_SECONDS = 60 * 60; // 1 hour KV cache
+const DISABLED_PASSWORD_HASH = "google:disabled";
+export const MAX_BCRYPT_PASSWORD_BYTES = 72;
 
 type SessionRow = { id: string; owner_id: string; expires_at: string };
-type OwnerRow = { id: string; email: string; full_name: string | null; password_hash: string };
+type OwnerRow = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  password_hash?: string | null;
+  google_sub?: string | null;
+  google_email?: string | null;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+export function passwordByteLength(password: string): number {
+  return new TextEncoder().encode(password).length;
+}
+
+export function passwordLengthError(password: string): string | null {
+  if (passwordByteLength(password) > MAX_BCRYPT_PASSWORD_BYTES) {
+    return "Password is too long. Use 72 bytes or fewer.";
+  }
+  return null;
+}
 
 async function hashPassword(password: string): Promise<string> {
   const bcrypt = await import("bcryptjs");
@@ -28,6 +48,7 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (!hash.startsWith("$2")) return false;
   const bcrypt = await import("bcryptjs");
   return bcrypt.compare(password, hash);
 }
@@ -38,6 +59,32 @@ function sessionExpiresAt(): string {
 
 function isExpired(expiresAt: string): boolean {
   return new Date(expiresAt).getTime() < Date.now();
+}
+
+function mapOwner(row: OwnerRow): Owner {
+  return {
+    id: row.id,
+    email: row.email,
+    name: row.full_name ?? row.email,
+    googleLinked: Boolean(row.google_sub),
+    googleEmail: row.google_email ?? null,
+    passwordLoginEnabled: Boolean(
+      row.password_hash && row.password_hash !== DISABLED_PASSWORD_HASH,
+    ),
+  };
+}
+
+async function createOwnerSession(owner: Owner): Promise<string> {
+  const db = getD1();
+  if (!db) return buildSessionCookie("dev-session");
+
+  const sessionId = crypto.randomUUID();
+  await d1Run(
+    db
+      .prepare("INSERT INTO sessions (id, owner_id, expires_at) VALUES (?, ?, ?)")
+      .bind(sessionId, owner.id, sessionExpiresAt()),
+  );
+  return buildSessionCookie(sessionId);
 }
 
 // ─── Cookie utilities (server-side, called from server handlers) ──────────────
@@ -80,15 +127,15 @@ export async function resolveSession(sessionId: string): Promise<Owner | null> {
   if (!session || isExpired(session.expires_at)) return null;
 
   const ownerRow = await d1First<OwnerRow>(
-    db.prepare("SELECT id, email, full_name FROM owners WHERE id = ?").bind(session.owner_id),
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+      )
+      .bind(session.owner_id),
   );
   if (!ownerRow) return null;
 
-  const owner: Owner = {
-    id: ownerRow.id,
-    email: ownerRow.email,
-    name: ownerRow.full_name ?? ownerRow.email,
-  };
+  const owner = mapOwner(ownerRow);
 
   // Backfill KV cache
   if (kv) {
@@ -144,6 +191,8 @@ export async function signInOwner(
     const owner = await getDevOwner();
     return { owner, sessionCookie: buildSessionCookie("dev-session") };
   }
+  const lengthError = passwordLengthError(password);
+  if (lengthError) throw new Error(lengthError);
 
   const db = getD1()!;
   // bcrypt silently truncates at 72 UTF-8 bytes — reject here so two passwords
@@ -153,27 +202,19 @@ export async function signInOwner(
   }
   const ownerRow = await d1First<OwnerRow>(
     db
-      .prepare("SELECT id, email, full_name, password_hash FROM owners WHERE email = ?")
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE email = ?",
+      )
       .bind(email.trim().toLowerCase()),
   );
   if (!ownerRow) throw new Error("Invalid email or password.");
+  if (!ownerRow.password_hash) throw new Error("Invalid email or password.");
 
   const valid = await verifyPassword(password, ownerRow.password_hash);
   if (!valid) throw new Error("Invalid email or password.");
 
-  const sessionId = crypto.randomUUID();
-  await d1Run(
-    db
-      .prepare("INSERT INTO sessions (id, owner_id, expires_at) VALUES (?, ?, ?)")
-      .bind(sessionId, ownerRow.id, sessionExpiresAt()),
-  );
-
-  const owner: Owner = {
-    id: ownerRow.id,
-    email: ownerRow.email,
-    name: ownerRow.full_name ?? ownerRow.email,
-  };
-  return { owner, sessionCookie: buildSessionCookie(sessionId) };
+  const owner = mapOwner(ownerRow);
+  return { owner, sessionCookie: await createOwnerSession(owner) };
 }
 
 /**
@@ -192,6 +233,8 @@ export async function signUpOwner(
   const db = getD1()!;
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = fullName?.trim() || null;
+  const lengthError = passwordLengthError(password);
+  if (lengthError) throw new Error(lengthError);
   const existing = await d1First<{ id: string }>(
     db.prepare("SELECT id FROM owners WHERE email = ?").bind(cleanEmail),
   );
@@ -205,15 +248,187 @@ export async function signUpOwner(
       .bind(ownerId, cleanEmail, hash, cleanName),
   );
 
-  const sessionId = crypto.randomUUID();
-  await d1Run(
+  const owner: Owner = {
+    id: ownerId,
+    email: cleanEmail,
+    name: cleanName ?? cleanEmail,
+    googleLinked: false,
+    googleEmail: null,
+    passwordLoginEnabled: true,
+  };
+  return { owner, sessionCookie: await createOwnerSession(owner) };
+}
+
+export async function signInOrLinkGoogleOwner(input: {
+  googleSub: string;
+  email: string;
+  emailVerified: boolean;
+  name?: string | null;
+  picture?: string | null;
+  linkOwnerId?: string | null;
+}): Promise<{ owner: Owner; sessionCookie: string }> {
+  if (!isD1Enabled()) throw new Error("Google sign-in is unavailable in local dev mode.");
+  if (!input.emailVerified) throw new Error("Google email must be verified.");
+
+  const db = getD1()!;
+  const cleanEmail = input.email.trim().toLowerCase();
+  const cleanName = input.name?.trim() || cleanEmail;
+
+  const ownerByGoogle = await d1First<OwnerRow>(
     db
-      .prepare("INSERT INTO sessions (id, owner_id, expires_at) VALUES (?, ?, ?)")
-      .bind(sessionId, ownerId, sessionExpiresAt()),
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE google_sub = ?",
+      )
+      .bind(input.googleSub),
   );
 
-  const owner: Owner = { id: ownerId, email: cleanEmail, name: cleanName ?? cleanEmail };
-  return { owner, sessionCookie: buildSessionCookie(sessionId) };
+  if (ownerByGoogle) {
+    const owner = mapOwner(ownerByGoogle);
+    return { owner, sessionCookie: await createOwnerSession(owner) };
+  }
+
+  if (input.linkOwnerId) {
+    const linkedElsewhere = await d1First<{ id: string }>(
+      db.prepare("SELECT id FROM owners WHERE google_sub = ?").bind(input.googleSub),
+    );
+    if (linkedElsewhere && linkedElsewhere.id !== input.linkOwnerId) {
+      throw new Error("That Google account is already connected to another owner.");
+    }
+    await d1Run(
+      db
+        .prepare(
+          `UPDATE owners SET
+             google_sub = ?, google_email = ?, google_name = ?, google_picture_url = ?,
+             google_linked_at = datetime('now'), updated_at = datetime('now')
+           WHERE id = ?`,
+        )
+        .bind(input.googleSub, cleanEmail, cleanName, input.picture ?? null, input.linkOwnerId),
+    );
+    const row = await d1First<OwnerRow>(
+      db
+        .prepare(
+          "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+        )
+        .bind(input.linkOwnerId),
+    );
+    if (!row) throw new Error("Owner not found.");
+    const owner = mapOwner(row);
+    return { owner, sessionCookie: await createOwnerSession(owner) };
+  }
+
+  const ownerByEmail = await d1First<OwnerRow>(
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE email = ?",
+      )
+      .bind(cleanEmail),
+  );
+  if (ownerByEmail) {
+    await d1Run(
+      db
+        .prepare(
+          `UPDATE owners SET
+             google_sub = ?, google_email = ?, google_name = ?, google_picture_url = ?,
+             google_linked_at = datetime('now'), updated_at = datetime('now')
+           WHERE id = ?`,
+        )
+        .bind(input.googleSub, cleanEmail, cleanName, input.picture ?? null, ownerByEmail.id),
+    );
+    const owner = mapOwner({
+      ...ownerByEmail,
+      google_sub: input.googleSub,
+      google_email: cleanEmail,
+    });
+    return { owner, sessionCookie: await createOwnerSession(owner) };
+  }
+
+  const ownerId = crypto.randomUUID();
+  await d1Run(
+    db
+      .prepare(
+        `INSERT INTO owners
+           (id, email, password_hash, full_name, google_sub, google_email, google_name,
+            google_picture_url, google_linked_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
+      )
+      .bind(
+        ownerId,
+        cleanEmail,
+        DISABLED_PASSWORD_HASH,
+        cleanName,
+        input.googleSub,
+        cleanEmail,
+        cleanName,
+        input.picture ?? null,
+      ),
+  );
+
+  const owner: Owner = {
+    id: ownerId,
+    email: cleanEmail,
+    name: cleanName,
+    googleLinked: true,
+    googleEmail: cleanEmail,
+    passwordLoginEnabled: false,
+  };
+  return { owner, sessionCookie: await createOwnerSession(owner) };
+}
+
+export async function disconnectGoogleOwner(ownerId: string): Promise<Owner> {
+  if (!isD1Enabled()) throw new Error("Google account linking is unavailable in local dev mode.");
+  const db = getD1()!;
+  const row = await d1First<OwnerRow>(
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+      )
+      .bind(ownerId),
+  );
+  if (!row) throw new Error("Owner not found.");
+  if (!row.google_sub) return mapOwner(row);
+  if (!row.password_hash || row.password_hash === DISABLED_PASSWORD_HASH) {
+    throw new Error("Add an email/password login before disconnecting Google.");
+  }
+  await d1Run(
+    db
+      .prepare(
+        `UPDATE owners SET
+           google_sub = NULL, google_email = NULL, google_name = NULL,
+           google_picture_url = NULL, google_linked_at = NULL, updated_at = datetime('now')
+         WHERE id = ?`,
+      )
+      .bind(ownerId),
+  );
+  return mapOwner({ ...row, google_sub: null, google_email: null });
+}
+
+/**
+ * Set (or replace) the password for an owner.
+ * Safe to call for Google-only owners: clears the `google:disabled` sentinel.
+ */
+export async function setPasswordOwner(ownerId: string, newPassword: string): Promise<Owner> {
+  if (!isD1Enabled()) throw new Error("Password management is unavailable in local dev mode.");
+  if (newPassword.length < 8) throw new Error("Password must be at least 8 characters.");
+  const lengthError = passwordLengthError(newPassword);
+  if (lengthError) throw new Error(lengthError);
+  const db = getD1()!;
+  const hash = await hashPassword(newPassword);
+  await d1Run(
+    db
+      .prepare(
+        "UPDATE owners SET password_hash = ?, updated_at = datetime('now') WHERE id = ?",
+      )
+      .bind(hash, ownerId),
+  );
+  const row = await d1First<OwnerRow>(
+    db
+      .prepare(
+        "SELECT id, email, full_name, password_hash, google_sub, google_email FROM owners WHERE id = ?",
+      )
+      .bind(ownerId),
+  );
+  if (!row) throw new Error("Owner not found.");
+  return mapOwner(row);
 }
 
 /**

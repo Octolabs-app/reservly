@@ -41,6 +41,7 @@ import { Route as ApiBillingConfigRouteImport } from './routes/api.billing.confi
 import { Route as ApiAuthSignupRouteImport } from './routes/api.auth.signup'
 import { Route as ApiAuthSignoutRouteImport } from './routes/api.auth.signout'
 import { Route as ApiAuthSigninRouteImport } from './routes/api.auth.signin'
+import { Route as ApiAuthSetPasswordRouteImport } from './routes/api.auth.set-password'
 import { Route as ApiAuthMeRouteImport } from './routes/api.auth.me'
 import { Route as ApiAuthDeleteAccountRouteImport } from './routes/api.auth.delete-account'
 import { Route as ApiAdminSystemRouteImport } from './routes/api.admin.system'
@@ -214,6 +215,11 @@ const ApiAuthSigninRoute = ApiAuthSigninRouteImport.update({
   path: '/signin',
   getParentRoute: () => ApiAuthRoute,
 } as any)
+const ApiAuthSetPasswordRoute = ApiAuthSetPasswordRouteImport.update({
+  id: '/set-password',
+  path: '/set-password',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
   id: '/me',
   path: '/me',
@@ -284,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/system': typeof ApiAdminSystemRoute
   '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/set-password': typeof ApiAuthSetPasswordRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/auth/signup': typeof ApiAuthSignupRoute
@@ -326,6 +333,7 @@ export interface FileRoutesByTo {
   '/api/admin/system': typeof ApiAdminSystemRoute
   '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/set-password': typeof ApiAuthSetPasswordRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/auth/signup': typeof ApiAuthSignupRoute
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/api/admin/system': typeof ApiAdminSystemRoute
   '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
   '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/set-password': typeof ApiAuthSetPasswordRoute
   '/api/auth/signin': typeof ApiAuthSigninRoute
   '/api/auth/signout': typeof ApiAuthSignoutRoute
   '/api/auth/signup': typeof ApiAuthSignupRoute
@@ -415,6 +424,7 @@ export interface FileRouteTypes {
     | '/api/admin/system'
     | '/api/auth/delete-account'
     | '/api/auth/me'
+    | '/api/auth/set-password'
     | '/api/auth/signin'
     | '/api/auth/signout'
     | '/api/auth/signup'
@@ -457,6 +467,7 @@ export interface FileRouteTypes {
     | '/api/admin/system'
     | '/api/auth/delete-account'
     | '/api/auth/me'
+    | '/api/auth/set-password'
     | '/api/auth/signin'
     | '/api/auth/signout'
     | '/api/auth/signup'
@@ -500,6 +511,7 @@ export interface FileRouteTypes {
     | '/api/admin/system'
     | '/api/auth/delete-account'
     | '/api/auth/me'
+    | '/api/auth/set-password'
     | '/api/auth/signin'
     | '/api/auth/signout'
     | '/api/auth/signup'
@@ -782,6 +794,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSigninRouteImport
       parentRoute: typeof ApiAuthRoute
     }
+    '/api/auth/set-password': {
+      id: '/api/auth/set-password'
+      path: '/set-password'
+      fullPath: '/api/auth/set-password'
+      preLoaderRoute: typeof ApiAuthSetPasswordRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
     '/api/auth/me': {
       id: '/api/auth/me'
       path: '/me'
@@ -867,6 +886,7 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 interface ApiAuthRouteChildren {
   ApiAuthDeleteAccountRoute: typeof ApiAuthDeleteAccountRoute
   ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthSetPasswordRoute: typeof ApiAuthSetPasswordRoute
   ApiAuthSigninRoute: typeof ApiAuthSigninRoute
   ApiAuthSignoutRoute: typeof ApiAuthSignoutRoute
   ApiAuthSignupRoute: typeof ApiAuthSignupRoute
@@ -875,6 +895,7 @@ interface ApiAuthRouteChildren {
 const ApiAuthRouteChildren: ApiAuthRouteChildren = {
   ApiAuthDeleteAccountRoute: ApiAuthDeleteAccountRoute,
   ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthSetPasswordRoute: ApiAuthSetPasswordRoute,
   ApiAuthSigninRoute: ApiAuthSigninRoute,
   ApiAuthSignoutRoute: ApiAuthSignoutRoute,
   ApiAuthSignupRoute: ApiAuthSignupRoute,
