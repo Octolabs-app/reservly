@@ -72,8 +72,14 @@ function Landing() {
       <SiteHeader />
       <main>
         {/* Hero */}
-        <section className="bg-gradient-to-b from-primary-soft to-white px-6 pb-16 pt-20">
-          <div className="mx-auto max-w-2xl text-center">
+        <section className="relative overflow-hidden bg-gradient-to-b from-primary-soft to-white px-6 pb-16 pt-20">
+          {/* Animated background orbs */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="hero-orb-1 absolute -left-32 -top-32 h-[500px] w-[500px] rounded-full bg-primary opacity-[0.07] blur-3xl" />
+            <div className="hero-orb-2 absolute -bottom-24 -right-24 h-[560px] w-[560px] rounded-full bg-[#6366f1] opacity-[0.06] blur-3xl" />
+            <div className="hero-orb-3 absolute left-1/2 -top-20 h-[380px] w-[380px] -translate-x-1/2 rounded-full bg-primary opacity-[0.05] blur-2xl" />
+          </div>
+          <div className="relative z-10 mx-auto max-w-2xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-wa/30 bg-wa-soft px-3 py-1.5">
               <span className="pulse-dot text-[10px] text-wa">●</span>
               <span className="text-xs font-medium text-success">
@@ -246,6 +252,10 @@ function Landing() {
               <span className="text-xs text-muted-foreground">by Octolabs · Mauritius 🇲🇺</span>
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Link to="/guide" className="hover:text-foreground">
+                Guide
+              </Link>
+              <span>·</span>
               <Link to="/help" className="hover:text-foreground">
                 Help
               </Link>
