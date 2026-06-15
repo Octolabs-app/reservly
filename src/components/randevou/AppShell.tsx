@@ -64,7 +64,13 @@ export function SiteHeader() {
             by Octolabs
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/guide"
+            className="hidden text-sm font-medium text-muted-foreground hover:text-foreground sm:block"
+          >
+            Guide
+          </Link>
           <Link to="/auth" className="btn-frame px-3 sm:px-4">
             Sign in
           </Link>

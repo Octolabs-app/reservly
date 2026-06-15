@@ -170,6 +170,34 @@ function Landing() {
           </div>
         </section>
 
+        {/* Guide callout */}
+        <section className="bg-primary px-6 py-14">
+          <div className="mx-auto max-w-3xl text-center">
+            <div className="mb-3 text-4xl">📖</div>
+            <h2 className="font-display text-2xl text-white sm:text-3xl">
+              New here? Read the 5-minute owner guide.
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-primary-mid">
+              Step-by-step walkthrough — from creating your account to managing bookings from your
+              phone. Everything you need, nothing you don't.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                to="/guide"
+                className="rounded-xl bg-white px-7 py-3.5 text-[15px] font-semibold text-primary transition hover:bg-primary-soft"
+              >
+                Read the guide →
+              </Link>
+              <Link
+                to="/onboarding"
+                className="rounded-xl border border-white/30 px-7 py-3.5 text-[15px] font-medium text-white transition hover:bg-white/10"
+              >
+                Skip — get my link now
+              </Link>
+            </div>
+          </div>
+        </section>
+
         {/* Pricing */}
         <section className="bg-white px-6 py-18">
           <div className="mx-auto max-w-3xl">
