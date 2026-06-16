@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 
 export const Route = createFileRoute("/terms")({
   head: () => ({
     meta: [
-      { title: "Terms - Reservly" },
-      { name: "description", content: "Reservly terms of service." },
+      { title: "Terms — Randevou" },
+      { name: "description", content: "Randevou terms of service." },
     ],
   }),
   component: TermsPage,
@@ -16,21 +16,22 @@ function TermsPage() {
     <>
       <SiteHeader />
       <Page width="md">
-        <Kicker tone="accent">Terms</Kicker>
-        <h1 className="mt-5 font-serif text-4xl text-foreground">Terms of service</h1>
-        <Panel className="mt-8 space-y-5 p-6 text-sm leading-6 text-muted-foreground">
+        <div className="kicker mb-2 text-primary">Terms</div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Terms of service</h1>
+        <Panel className="mt-6 space-y-4 p-6 text-sm leading-relaxed text-muted-foreground">
           <p>
-            Reservly helps businesses collect booking requests and manage availability. Businesses
+            Randevou helps businesses collect booking requests and manage availability. Businesses
             remain responsible for service delivery, customer communication, pricing, and local
             compliance.
           </p>
           <p>
-            The Free plan includes 15 bookings per calendar month. Pro and Studio plans are treated
-            as unlimited inside the application.
+            The Free plan includes 15 bookings per calendar month. The Pro plan is treated as
+            unlimited inside the application.
           </p>
           <p>
-            Messaging and payment integrations depend on correctly configured Twilio, Stripe, and
-            Supabase environment variables.
+            WhatsApp delivery depends on Twilio. Owner subscription upgrades are handled manually
+            until an approved billing provider is configured. Randevou is not liable for outages or
+            delivery failures of third-party providers.
           </p>
         </Panel>
       </Page>

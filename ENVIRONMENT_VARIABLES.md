@@ -1,31 +1,71 @@
 # Environment Variables
 
-Never commit real secrets. Use `.env.local` locally and your deployment provider's secret storage in production.
+Never commit real secrets. Locally, **nothing is required** (the in-browser dev
+store runs without credentials). In production, set non-secret runtime vars in
+`wrangler.toml` `[vars]` and secrets via
+`wrangler pages secret put <NAME> --project-name=randevou`. Do not rely on
+Cloudflare dashboard vars for runtime values; Pages advanced mode reads the
+`wrangler.toml` configuration.
 
-## Required
+## Server (Cloudflare Pages bindings + vars)
 
-| Variable                      | Purpose                                                      |
-| ----------------------------- | ------------------------------------------------------------ |
-| `SUPABASE_URL`                | Supabase project URL for server-side code.                   |
-| `SUPABASE_ANON_KEY`           | Supabase publishable or legacy anon key.                     |
-| `SUPABASE_SERVICE_ROLE_KEY`   | Server-only Supabase secret/service role key.                |
-| `TWILIO_ACCOUNT_SID`          | Twilio account SID.                                          |
-| `TWILIO_AUTH_TOKEN`           | Twilio auth token.                                           |
-| `TWILIO_WHATSAPP_FROM`        | Twilio WhatsApp sender, for example `whatsapp:+14155238886`. |
-| `STRIPE_SECRET_KEY`           | Stripe secret key.                                           |
-| `STRIPE_WEBHOOK_SECRET`       | Stripe webhook signing secret.                               |
-| `STRIPE_PRICE_PRO_MONTHLY`    | Stripe recurring price ID for Pro.                           |
-| `STRIPE_PRICE_STUDIO_MONTHLY` | Stripe recurring price ID for Studio.                        |
-| `SITE_URL`                    | Public site URL, without a trailing slash.                   |
+| Variable               | Required   | Purpose                                                                                                                                       |
+| ---------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DB` (D1 binding)      | yes        | Cloudflare D1 database (`randevou-db`).                                                                                                       |
+| `KV` (KV binding)      | yes        | Session cache, OAuth state, and rate-limit counters (`randevou-sessions`).                                                                    |
+| `SITE_URL`             | yes        | Public site URL, no trailing slash (`https://randevou.octolabs.app`). Used in WhatsApp links, booking links, and Twilio signature validation. |
+| `ADMIN_EMAILS`         | for /admin | Comma-separated owner emails allowed into the platform admin (`/admin`). Empty = nobody can access admin in production.                       |
+| `TWILIO_ACCOUNT_SID`   | no\*       | Twilio account SID.                                                                                                                           |
+| `TWILIO_AUTH_TOKEN`    | no\*       | Twilio auth token — also validates inbound webhook signatures.                                                                                |
+| `TWILIO_WHATSAPP_FROM` | no\*       | WhatsApp sender, e.g. `whatsapp:+14155238886`.                                                                                                |
+| `GOOGLE_CLIENT_ID`     | no         | Google OAuth web client ID. Set in `wrangler.toml` `[vars]` when Google owner sign-in is enabled.                                             |
+| `GOOGLE_CLIENT_SECRET` | no         | Google OAuth web client secret. Store with `wrangler pages secret put`; never commit it.                                                       |
 
-## Vite Client Aliases
+\* Optional at launch: without Twilio vars, outbound messages are logged to the
+D1 `message_events` table instead of being sent, and the app still works.
 
-The browser Supabase client also reads:
+## Billing (no-BRN-friendly — no BRN / company registration required)
 
-| Variable                 | Purpose                                     |
-| ------------------------ | ------------------------------------------- |
-| `VITE_SUPABASE_URL`      | Supabase URL exposed to the client.         |
-| `VITE_SUPABASE_ANON_KEY` | Publishable/anon key exposed to the client. |
-| `VITE_SITE_URL`          | Public URL exposed to the client.           |
+Billing is for the **business owner's SaaS subscription only**. Randevou never
+processes customer→business appointment payments. Set up **one** automated
+provider when approved; until then upgrades are handled manually by an admin.
 
-Supabase's current key model prefers publishable keys for client-side use and secret keys for trusted backends.
+**Paddle — primary (Individual / Sole Trader):**
+
+| Variable                | Purpose                        |
+| ----------------------- | ------------------------------ |
+| `PADDLE_API_KEY`        | Paddle API key.                |
+| `PADDLE_WEBHOOK_SECRET` | Paddle webhook signing secret. |
+| `PADDLE_ENVIRONMENT`    | `sandbox` or `production`.     |
+| `PADDLE_PRICE_PRO`      | Paddle price ID for Pro.       |
+| `PADDLE_PRICE_STUDIO`   | Paddle price ID for Studio.    |
+
+**Dodo Payments — backup (individual / unregistered business):**
+
+| Variable              | Purpose                      |
+| --------------------- | ---------------------------- |
+| `DODO_API_KEY`        | Dodo API key.                |
+| `DODO_WEBHOOK_SECRET` | Dodo webhook signing secret. |
+| `DODO_ENVIRONMENT`    | `test` or `live`.            |
+| `DODO_PRICE_PRO`      | Dodo price ID for Pro.       |
+| `DODO_PRICE_STUDIO`   | Dodo price ID for Studio.    |
+
+**PayPal manual fallback:** no env vars. An admin marks an owner paid in
+`/admin → Businesses → Mark paid` (stored as `provider = paypal_manual`).
+
+**Stripe — future only:** no Stripe env vars are used now. The app does not
+require, read, or auto-select Stripe unless Octolabs later approves a supported
+legal/business setup and a new implementation is shipped.
+
+The admin **System** tab shows which providers are configured (yes/no) without
+revealing any secret values.
+
+## Build-time (Vite, baked into the client bundle)
+
+| Variable        | Purpose                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `VITE_SITE_URL` | Public URL the client renders in share links and the booking-link panel. Set it in the Pages build environment, then redeploy. |
+
+There are no Supabase variables (the Supabase backend was fully replaced by
+Cloudflare D1/KV) and no `SESSION_SECRET` (sessions are random UUIDs stored
+server-side; nothing is signed).

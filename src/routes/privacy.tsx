@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Kicker, Page, Panel, SiteHeader } from "@/components/reservly/AppShell";
+import { Page, Panel, SiteHeader } from "@/components/randevou/AppShell";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
-      { title: "Privacy - Reservly" },
-      { name: "description", content: "Reservly privacy notice." },
+      { title: "Privacy — Randevou" },
+      { name: "description", content: "Randevou privacy notice." },
     ],
   }),
   component: PrivacyPage,
@@ -16,20 +16,22 @@ function PrivacyPage() {
     <>
       <SiteHeader />
       <Page width="md">
-        <Kicker tone="accent">Privacy</Kicker>
-        <h1 className="mt-5 font-serif text-4xl text-foreground">Privacy notice</h1>
-        <Panel className="mt-8 space-y-5 p-6 text-sm leading-6 text-muted-foreground">
+        <div className="kicker mb-2 text-primary">Privacy</div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Privacy notice</h1>
+        <Panel className="mt-6 space-y-4 p-6 text-sm leading-relaxed text-muted-foreground">
           <p>
-            Reservly stores business profile details, service details, availability, and customer
+            Randevou stores business profile details, service details, availability, and customer
             booking details so bookings can be confirmed and managed.
           </p>
           <p>
             WhatsApp numbers are used for booking confirmations, owner alerts, cancellations, and
-            customer replies. Payment data is handled by Stripe and is not stored directly by
-            Reservly.
+            customer replies. Messages are delivered through Twilio. Owner subscription payments are
+            handled manually until an approved billing provider is configured. Application data is
+            hosted on Cloudflare.
           </p>
           <p>
-            Business owners can request export or deletion of their data by contacting Octolabs.
+            Business owners can delete their account and all associated data at any time from
+            Settings, or request export or deletion of their data by contacting Octolabs.
           </p>
         </Panel>
       </Page>

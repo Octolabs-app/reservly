@@ -1,0 +1,22 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { getSessionIdFromCookieHeader, signOutOwner } from "@/lib/cf/auth";
+import { requireSameOriginMutation } from "@/lib/cf/api";
+
+export const Route = createFileRoute("/api/auth/signout")({
+  component: Empty,
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const csrf = requireSameOriginMutation(request);
+        if (csrf) return csrf;
+        const sessionId = getSessionIdFromCookieHeader(request.headers.get("cookie"));
+        const clearCookie = await signOutOwner(sessionId ?? "");
+        return Response.json({}, { headers: { "Set-Cookie": clearCookie } });
+      },
+    },
+  },
+});
+
+function Empty() {
+  return null;
+}

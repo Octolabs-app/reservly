@@ -1,0 +1,1136 @@
+// src/lib/cf/data.ts
+// Data access layer backed by Cloudflare D1.
+// Replaces: src/lib/rezavu/data.ts (Supabase SDK calls)
+//
+// All functions follow the same dual-path pattern as the original:
+//   - If D1 is available  → use D1
+//   - If not (local dev)  → fall back to dev-store
+//
+// Row types mirror the D1 schema columns exactly (snake_case).
+// Mapping functions convert to the app's camelCase types.
+
+import { getCFEnv, getD1, d1All, d1First, d1Run, isD1Enabled, type D1Database } from "./db";
+import { getCurrentOwner } from "./auth";
+import {
+  sendTemplatedBookingConfirmation,
+  sendTemplatedCancellationMessage,
+  sendTemplatedOwnerBookingAlert,
+} from "./messaging";
+import {
+  cancelDevBooking,
+  confirmDevBooking,
+  createDevBooking,
+  createDevBusiness,
+  createDevService,
+  deleteDevService,
+  devSlugExists,
+  getDevBookingById,
+  getDevDashboardData,
+  getDevPublicBusinessById,
+  getDevPublicBusinessBySlug,
+  saveLastBooking,
+  updateDevAvailability,
+  updateDevBusiness,
+  updateDevService,
+} from "@/lib/randevou/dev-store";
+import { generateUniqueSlug } from "@/lib/randevou/slug";
+import {
+  calculateMonthlyUsage,
+  addDaysToDateInput,
+  formatDateLabel,
+  formatTimeLabel,
+  generateSlots,
+  getMauritiusDayOfWeek,
+  isoFromMauritiusLocal,
+  mauritiusDateFromIso,
+  mauritiusMonthBounds,
+  mauritiusTodayInput,
+} from "@/lib/randevou/slots";
+import { normalizeWhatsAppNumber, validateWhatsAppNumber } from "@/lib/randevou/phone";
+import { generateBookingRef } from "@/lib/randevou/ref";
+import {
+  DEFAULT_MAX_ADVANCE_DAYS,
+  DEFAULT_MIN_NOTICE_MINUTES,
+  DEFAULT_SLOT_INTERVAL_MINUTES,
+  FREE_BOOKING_LIMIT,
+  type Availability,
+  type AvailabilityInput,
+  type Booking,
+  type BookingLanguage,
+  type BookingInput,
+  type Business,
+  type BusinessInput,
+  type DashboardData,
+  type Owner,
+  type Plan,
+  type PlanUsage,
+  type PublicBusiness,
+  type Service,
+  type ServiceInput,
+  type Slot,
+} from "@/lib/randevou/types";
+
+// ─── Row types (D1 column names) ─────────────────────────────────────────────
+
+type BusinessRow = {
+  id: string;
+  owner_id: string;
+  name: string;
+  slug: string;
+  category: string;
+  city: string;
+  whatsapp_number: string;
+  booking_page_language: string;
+  timezone: string;
+  plan: string;
+  booking_limit_monthly: number | null;
+  min_notice_minutes: number | null;
+  max_advance_days: number | null;
+  slot_interval_minutes: number | null;
+  no_same_day: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+async function resolveOwner(ownerOverride?: Owner | null): Promise<Owner | null> {
+  return ownerOverride ?? getCurrentOwner();
+}
+
+async function requireOwnerId(ownerId?: string): Promise<string> {
+  const resolved = ownerId ?? (await getCurrentOwner())?.id;
+  if (!resolved) throw new Error("You need to sign in first.");
+  return resolved;
+}
+
+async function ensureBusinessOwner(
+  db: D1Database,
+  businessId: string,
+  ownerId: string,
+): Promise<void> {
+  const row = await d1First<{ id: string }>(
+    db.prepare("SELECT id FROM businesses WHERE id = ? AND owner_id = ?").bind(businessId, ownerId),
+  );
+  if (!row) throw new Error("You do not have access to this business.");
+}
+
+/**
+ * Booking-rule values come straight from request JSON — clamp them so a bad
+ * PATCH can't poison slot generation (a 0/negative interval would loop the
+ * public slots endpoint forever).
+ */
+function clampBookingRules(input: Partial<BusinessInput>) {
+  const out: {
+    minNoticeMinutes?: number;
+    maxAdvanceDays?: number;
+    slotIntervalMinutes?: number | null;
+  } = {};
+  if (input.minNoticeMinutes != null) {
+    out.minNoticeMinutes = Math.min(43200, Math.max(0, Math.round(input.minNoticeMinutes) || 0));
+  }
+  if (input.maxAdvanceDays != null) {
+    out.maxAdvanceDays = Math.min(
+      365,
+      Math.max(1, Math.round(input.maxAdvanceDays) || DEFAULT_MAX_ADVANCE_DAYS),
+    );
+  }
+  if ("slotIntervalMinutes" in input) {
+    out.slotIntervalMinutes = [10, 15, 20, 30, 45, 60].includes(input.slotIntervalMinutes as number)
+      ? (input.slotIntervalMinutes as number)
+      : null;
+  }
+  return out;
+}
+
+function siteUrlFromEnv() {
+  return (getCFEnv()?.SITE_URL ?? "https://randevou.octolabs.app").replace(/\/$/, "");
+}
+type ServiceRow = {
+  id: string;
+  business_id: string;
+  name: string;
+  duration_minutes: number;
+  price_label: string;
+  active: number;
+  all_day: number | null;
+  created_at: string;
+  updated_at: string;
+};
+type AvailabilityRow = {
+  id: string;
+  business_id: string;
+  day_of_week: number;
+  is_open: number;
+  opens_at: string;
+  closes_at: string;
+  created_at: string;
+  updated_at: string;
+};
+type BookingRow = {
+  id: string;
+  business_id: string;
+  service_id: string;
+  customer_name: string;
+  customer_phone: string;
+  customer_language: string;
+  start_at: string;
+  end_at: string;
+  status: string;
+  source: string;
+  booking_ref: string | null;
+  notes: string | null;
+  cancellation_reason: string | null;
+  created_at: string;
+  updated_at: string;
+  // joined fields (optional)
+  service_name?: string;
+  service_price_label?: string;
+  business_name?: string;
+  business_slug?: string;
+};
+
+function mauritiusDayBounds(date: string): { start: string; end: string } {
+  return {
+    start: isoFromMauritiusLocal(date, "00:00"),
+    end: isoFromMauritiusLocal(addDaysToDateInput(date, 1), "00:00"),
+  };
+}
+
+function usageFromCount(plan: Plan, limit: number | null, used: number): PlanUsage {
+  const effectiveLimit = plan === "free" ? (limit ?? FREE_BOOKING_LIMIT) : null;
+  return {
+    plan,
+    used,
+    limit: effectiveLimit,
+    nearLimit: effectiveLimit === null ? false : used >= Math.max(1, effectiveLimit - 3),
+    full: effectiveLimit === null ? false : used >= effectiveLimit,
+  };
+}
+
+// ─── Map helpers ─────────────────────────────────────────────────────────────
+
+function mapPlan(val: string | null | undefined): Plan {
+  if (val === "pro" || val === "studio") return val;
+  return "free";
+}
+
+function mapBusiness(row: BusinessRow): Business {
+  return {
+    id: row.id,
+    ownerId: row.owner_id,
+    name: row.name,
+    slug: row.slug,
+    category: row.category,
+    city: row.city ?? "",
+    whatsappNumber: row.whatsapp_number ?? "",
+    bookingPageLanguage: (row.booking_page_language as Business["bookingPageLanguage"]) ?? "Both",
+    timezone: row.timezone ?? "Indian/Mauritius",
+    plan: mapPlan(row.plan),
+    bookingLimitMonthly: row.booking_limit_monthly ?? FREE_BOOKING_LIMIT,
+    minNoticeMinutes: row.min_notice_minutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+    maxAdvanceDays: row.max_advance_days ?? DEFAULT_MAX_ADVANCE_DAYS,
+    slotIntervalMinutes: row.slot_interval_minutes ?? null,
+    noSameDay: Boolean(row.no_same_day),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapService(row: ServiceRow): Service {
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    name: row.name,
+    durationMinutes: row.duration_minutes,
+    priceLabel: row.price_label ?? "",
+    active: Boolean(row.active),
+    allDay: Boolean(row.all_day),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function mapAvailability(row: AvailabilityRow): Availability {
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    dayOfWeek: row.day_of_week,
+    isOpen: Boolean(row.is_open),
+    opensAt: row.opens_at?.slice(0, 5) ?? "09:00",
+    closesAt: row.closes_at?.slice(0, 5) ?? "18:00",
+  };
+}
+
+function mapBooking(row: BookingRow): Booking {
+  return {
+    id: row.id,
+    businessId: row.business_id,
+    serviceId: row.service_id,
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    customerLanguage: (row.customer_language as Booking["customerLanguage"]) ?? "Both",
+    startAt: row.start_at,
+    endAt: row.end_at,
+    status: (row.status as Booking["status"]) ?? "pending",
+    source: (row.source as Booking["source"]) ?? "public",
+    bookingRef: row.booking_ref ?? null,
+    notes: row.notes,
+    createdAt: row.created_at,
+    serviceName: row.service_name,
+    servicePriceLabel: row.service_price_label,
+    businessName: row.business_name,
+    businessSlug: row.business_slug,
+  };
+}
+
+// ─── Business ────────────────────────────────────────────────────────────────
+
+export async function createBusiness(
+  input: BusinessInput,
+  ownerOverride?: Owner | null,
+): Promise<Business> {
+  if (!isD1Enabled()) return createDevBusiness(input);
+
+  const db = getD1()!;
+  const owner = await resolveOwner(ownerOverride);
+  if (!owner) throw new Error("You need to sign in before creating a business.");
+
+  const slug = await generateUniqueSlug(input.name, async (candidate) => {
+    const row = await d1First(
+      db.prepare("SELECT id FROM businesses WHERE slug = ?").bind(candidate),
+    );
+    return Boolean(row);
+  });
+
+  const id = crypto.randomUUID();
+  await d1Run(
+    db
+      .prepare(
+        `
+      INSERT INTO businesses
+        (id, owner_id, name, slug, category, city, whatsapp_number,
+         booking_page_language, timezone, plan, booking_limit_monthly,
+         min_notice_minutes, max_advance_days, slot_interval_minutes, no_same_day)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Indian/Mauritius', 'free', ?, ?, ?, ?, ?)
+    `,
+      )
+      .bind(
+        id,
+        owner.id,
+        input.name.trim(),
+        slug,
+        input.category,
+        input.city.trim(),
+        normalizeWhatsAppNumber(input.whatsappNumber),
+        input.bookingPageLanguage,
+        FREE_BOOKING_LIMIT,
+        clampBookingRules(input).minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+        clampBookingRules(input).maxAdvanceDays ?? DEFAULT_MAX_ADVANCE_DAYS,
+        clampBookingRules(input).slotIntervalMinutes ?? null,
+        input.noSameDay ? 1 : 0,
+      ),
+  );
+
+  const row = await d1First<BusinessRow>(
+    db.prepare("SELECT * FROM businesses WHERE id = ?").bind(id),
+  );
+  return mapBusiness(row!);
+}
+
+export async function getBusinessForOwner(ownerId?: string): Promise<Business | null> {
+  if (!isD1Enabled()) return (await getDevDashboardData()).business;
+
+  const db = getD1()!;
+  const owner = ownerId ?? (await getCurrentOwner())?.id;
+  if (!owner) return null;
+
+  const row = await d1First<BusinessRow>(
+    db
+      .prepare("SELECT * FROM businesses WHERE owner_id = ? ORDER BY created_at ASC LIMIT 1")
+      .bind(owner),
+  );
+  return row ? mapBusiness(row) : null;
+}
+
+export async function getPublicBusinessBySlug(slug: string): Promise<PublicBusiness | null> {
+  if (!isD1Enabled()) return getDevPublicBusinessBySlug(slug);
+
+  const db = getD1()!;
+  const bizRow = await d1First<BusinessRow>(
+    db.prepare("SELECT * FROM businesses WHERE slug = ?").bind(slug),
+  );
+  if (!bizRow) return null;
+
+  const business = mapBusiness(bizRow);
+  const currentMonth = mauritiusMonthBounds(new Date().toISOString());
+
+  const [serviceRows, availRows, usageRow] = await Promise.all([
+    d1All<ServiceRow>(
+      db
+        .prepare("SELECT * FROM services WHERE business_id = ? AND active = 1 ORDER BY created_at")
+        .bind(business.id),
+    ),
+    d1All<AvailabilityRow>(
+      db
+        .prepare("SELECT * FROM availability WHERE business_id = ? ORDER BY day_of_week")
+        .bind(business.id),
+    ),
+    d1First<{ count: number }>(
+      db
+        .prepare(
+          `SELECT COUNT(*) count FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at >= ? AND start_at < ?`,
+        )
+        .bind(business.id, currentMonth.start, currentMonth.end),
+    ),
+  ]);
+
+  return {
+    business,
+    services: serviceRows.map(mapService),
+    availability: availRows.map(mapAvailability),
+    usage: usageFromCount(business.plan, business.bookingLimitMonthly, usageRow?.count ?? 0),
+  };
+}
+
+export async function updateBusiness(
+  input: Partial<BusinessInput> & { id: string },
+  ownerId?: string,
+): Promise<Business> {
+  if (!isD1Enabled()) return updateDevBusiness(input);
+
+  const db = getD1()!;
+  const currentOwnerId = await requireOwnerId(ownerId);
+  await d1Run(
+    db
+      .prepare(
+        `
+      UPDATE businesses SET
+        name = COALESCE(?, name), category = COALESCE(?, category),
+        city = COALESCE(?, city), whatsapp_number = COALESCE(?, whatsapp_number),
+        booking_page_language = COALESCE(?, booking_page_language),
+        min_notice_minutes = COALESCE(?, min_notice_minutes),
+        max_advance_days = COALESCE(?, max_advance_days),
+        slot_interval_minutes = CASE WHEN ? = 1 THEN ? ELSE slot_interval_minutes END,
+        no_same_day = COALESCE(?, no_same_day),
+        updated_at = datetime('now')
+      WHERE id = ? AND owner_id = ?
+    `,
+      )
+      .bind(
+        input.name ?? null,
+        input.category ?? null,
+        input.city ?? null,
+        input.whatsappNumber != null ? normalizeWhatsAppNumber(input.whatsappNumber) : null,
+        input.bookingPageLanguage ?? null,
+        clampBookingRules(input).minNoticeMinutes ?? null,
+        clampBookingRules(input).maxAdvanceDays ?? null,
+        "slotIntervalMinutes" in input ? 1 : 0,
+        clampBookingRules(input).slotIntervalMinutes ?? null,
+        input.noSameDay != null ? (input.noSameDay ? 1 : 0) : null,
+        input.id,
+        currentOwnerId,
+      ),
+  );
+
+  const row = await d1First<BusinessRow>(
+    db
+      .prepare("SELECT * FROM businesses WHERE id = ? AND owner_id = ?")
+      .bind(input.id, currentOwnerId),
+  );
+  if (!row) throw new Error("Business not found.");
+  return mapBusiness(row!);
+}
+
+export async function slugExists(slug: string): Promise<boolean> {
+  if (!isD1Enabled()) return devSlugExists(slug);
+  const db = getD1()!;
+  const row = await d1First(db.prepare("SELECT id FROM businesses WHERE slug = ?").bind(slug));
+  return Boolean(row);
+}
+
+// ─── Services ────────────────────────────────────────────────────────────────
+
+export async function createService(input: ServiceInput, ownerId?: string): Promise<Service> {
+  if (!isD1Enabled()) return createDevService(input);
+
+  const db = getD1()!;
+  await ensureBusinessOwner(db, input.businessId, await requireOwnerId(ownerId));
+  const id = crypto.randomUUID();
+  await d1Run(
+    db
+      .prepare(
+        `
+      INSERT INTO services (id, business_id, name, duration_minutes, price_label, active, all_day)
+      VALUES (?, ?, ?, ?, ?, 1, ?)
+    `,
+      )
+      .bind(
+        id,
+        input.businessId,
+        input.name.trim(),
+        input.durationMinutes,
+        input.priceLabel.trim(),
+        input.allDay ? 1 : 0,
+      ),
+  );
+
+  const row = await d1First<ServiceRow>(db.prepare("SELECT * FROM services WHERE id = ?").bind(id));
+  return mapService(row!);
+}
+
+export async function updateService(
+  input: Partial<ServiceInput> & { id: string },
+  ownerId?: string,
+): Promise<Service> {
+  if (!isD1Enabled()) return updateDevService(input);
+
+  const db = getD1()!;
+  const existing = await d1First<ServiceRow>(
+    db.prepare("SELECT * FROM services WHERE id = ?").bind(input.id),
+  );
+  if (!existing) throw new Error("Service not found.");
+  await ensureBusinessOwner(db, existing.business_id, await requireOwnerId(ownerId));
+  await d1Run(
+    db
+      .prepare(
+        `
+      UPDATE services SET
+        name = COALESCE(?, name),
+        duration_minutes = COALESCE(?, duration_minutes),
+        price_label = COALESCE(?, price_label),
+        active = COALESCE(?, active),
+        all_day = COALESCE(?, all_day),
+        updated_at = datetime('now')
+      WHERE id = ?
+    `,
+      )
+      .bind(
+        input.name ?? null,
+        input.durationMinutes ?? null,
+        input.priceLabel ?? null,
+        input.active != null ? (input.active ? 1 : 0) : null,
+        input.allDay != null ? (input.allDay ? 1 : 0) : null,
+        input.id,
+      ),
+  );
+
+  const row = await d1First<ServiceRow>(
+    db.prepare("SELECT * FROM services WHERE id = ?").bind(input.id),
+  );
+  return mapService(row!);
+}
+
+export async function deleteService(id: string, ownerId?: string): Promise<void> {
+  if (!isD1Enabled()) return deleteDevService(id);
+  const db = getD1()!;
+  const existing = await d1First<ServiceRow>(
+    db.prepare("SELECT * FROM services WHERE id = ?").bind(id),
+  );
+  if (!existing) throw new Error("Service not found.");
+  await ensureBusinessOwner(db, existing.business_id, await requireOwnerId(ownerId));
+  await d1Run(
+    db
+      .prepare("UPDATE services SET active = 0, updated_at = datetime('now') WHERE id = ?")
+      .bind(id),
+  );
+}
+
+// ─── Availability ─────────────────────────────────────────────────────────────
+
+export async function updateAvailability(
+  input: AvailabilityInput,
+  ownerId?: string,
+): Promise<Availability[]> {
+  if (!isD1Enabled()) return updateDevAvailability(input);
+
+  const db = getD1()!;
+  await ensureBusinessOwner(db, input.businessId, await requireOwnerId(ownerId));
+  const stmts = input.days.map((day) =>
+    db
+      .prepare(
+        `
+      INSERT INTO availability (id, business_id, day_of_week, is_open, opens_at, closes_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(business_id, day_of_week) DO UPDATE SET
+        is_open = excluded.is_open,
+        opens_at = excluded.opens_at,
+        closes_at = excluded.closes_at,
+        updated_at = datetime('now')
+    `,
+      )
+      .bind(
+        crypto.randomUUID(),
+        input.businessId,
+        day.dayOfWeek,
+        day.isOpen ? 1 : 0,
+        day.opensAt,
+        day.closesAt,
+      ),
+  );
+
+  await db.batch(stmts);
+  const rows = await d1All<AvailabilityRow>(
+    db
+      .prepare("SELECT * FROM availability WHERE business_id = ? ORDER BY day_of_week")
+      .bind(input.businessId),
+  );
+  return rows.map(mapAvailability);
+}
+
+// ─── Bookings ────────────────────────────────────────────────────────────────
+
+export async function getAvailableSlots(
+  businessId: string,
+  serviceId: string,
+  date: string,
+): Promise<Slot[]> {
+  if (!isD1Enabled()) {
+    const devPublic = await getDevPublicBusinessById(businessId);
+    const service = devPublic?.services.find((s) => s.id === serviceId);
+    if (!devPublic || !service) return [];
+    return generateSlots({
+      date,
+      service,
+      availability: devPublic.availability,
+      bookings: devPublic.bookings ?? [],
+      monthlyFull: devPublic.usage.full,
+      stepMinutes: devPublic.business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+      minNoticeMinutes: devPublic.business.minNoticeMinutes ?? DEFAULT_MIN_NOTICE_MINUTES,
+      noSameDay: devPublic.business.noSameDay,
+    });
+  }
+
+  const db = getD1()!;
+  const dayBounds = mauritiusDayBounds(date);
+  const monthBounds = mauritiusMonthBounds(isoFromMauritiusLocal(date, "12:00"));
+
+  const [serviceRow, availRows, bookingRows, bizRow, usageRow] = await Promise.all([
+    d1First<ServiceRow>(
+      db.prepare("SELECT * FROM services WHERE id = ? AND active = 1").bind(serviceId),
+    ),
+    d1All<AvailabilityRow>(
+      db.prepare("SELECT * FROM availability WHERE business_id = ?").bind(businessId),
+    ),
+    d1All<BookingRow>(
+      db
+        .prepare(
+          `SELECT * FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at < ? AND end_at > ?`,
+        )
+        .bind(businessId, dayBounds.end, dayBounds.start),
+    ),
+    d1First<BusinessRow>(db.prepare("SELECT * FROM businesses WHERE id = ?").bind(businessId)),
+    d1First<{ count: number }>(
+      db
+        .prepare(
+          `SELECT COUNT(*) count FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at >= ? AND start_at < ?`,
+        )
+        .bind(businessId, monthBounds.start, monthBounds.end),
+    ),
+  ]);
+
+  if (!serviceRow || !bizRow) return [];
+
+  const business = mapBusiness(bizRow);
+  const service = mapService(serviceRow);
+  const bookings = bookingRows.map(mapBooking);
+  const monthlyFull = usageFromCount(
+    business.plan,
+    business.bookingLimitMonthly,
+    usageRow?.count ?? 0,
+  ).full;
+
+  return generateSlots({
+    date,
+    service,
+    availability: availRows.map(mapAvailability),
+    bookings,
+    monthlyFull,
+    stepMinutes: business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+    minNoticeMinutes: business.minNoticeMinutes,
+    noSameDay: business.noSameDay,
+  });
+}
+
+/**
+ * Re-generate the available slots for a booking's business+service+date and
+ * confirm the requested startAt is one of the AVAILABLE ones. This is the
+ * server-side guard: never trust a client-posted date/time. Returns true if
+ * the slot is currently bookable.
+ */
+async function isValidAvailableSlot(
+  db: D1Database,
+  business: Business,
+  service: Service,
+  startAt: string,
+): Promise<boolean> {
+  const date = mauritiusDateFromIso(startAt);
+  const dayBounds = mauritiusDayBounds(date);
+  const monthBounds = mauritiusMonthBounds(isoFromMauritiusLocal(date, "12:00"));
+  const [availRows, bookingRows, usageRow] = await Promise.all([
+    d1All<AvailabilityRow>(
+      db.prepare("SELECT * FROM availability WHERE business_id = ?").bind(business.id),
+    ),
+    d1All<BookingRow>(
+      db
+        .prepare(
+          `SELECT * FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at < ? AND end_at > ?`,
+        )
+        .bind(business.id, dayBounds.end, dayBounds.start),
+    ),
+    d1First<{ count: number }>(
+      db
+        .prepare(
+          `SELECT COUNT(*) count FROM bookings
+           WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at >= ? AND start_at < ?`,
+        )
+        .bind(business.id, monthBounds.start, monthBounds.end),
+    ),
+  ]);
+  const monthlyFull = usageFromCount(
+    business.plan,
+    business.bookingLimitMonthly,
+    usageRow?.count ?? 0,
+  ).full;
+  const slots = generateSlots({
+    date,
+    service,
+    availability: availRows.map(mapAvailability),
+    bookings: bookingRows.map(mapBooking),
+    monthlyFull,
+    stepMinutes: business.slotIntervalMinutes ?? DEFAULT_SLOT_INTERVAL_MINUTES,
+    minNoticeMinutes: business.minNoticeMinutes,
+    noSameDay: business.noSameDay,
+  });
+  return slots.some((slot) => slot.available && slot.startAt === startAt);
+}
+
+// booking_ref uniqueness is enforced by the DB UNIQUE partial index
+// (migration 0005). The INSERT loop retries on collision.
+
+
+function validateBookingInput(input: BookingInput, options: { phoneRequired: boolean }) {
+  const name = input.customerName?.trim() ?? "";
+  if (name.length < 2 || name.length > 80) {
+    throw new Error("Enter the customer's name (2–80 characters).");
+  }
+  const rawPhone = input.customerPhone?.trim() ?? "";
+  let phone = "";
+  if (rawPhone || options.phoneRequired) {
+    const error = validateWhatsAppNumber(rawPhone);
+    if (error) throw new Error(error);
+    phone = normalizeWhatsAppNumber(rawPhone);
+  }
+  if (!input.startAt || Number.isNaN(new Date(input.startAt).getTime())) {
+    throw new Error("Invalid booking time. Please pick a slot again.");
+  }
+  if (input.notes && input.notes.length > 500) {
+    throw new Error("Notes are too long (max 500 characters).");
+  }
+  const language: BookingLanguage = ["English", "Francais", "Both"].includes(input.customerLanguage)
+    ? input.customerLanguage
+    : "Both";
+  return { name, phone, language };
+}
+
+type CreateBookingOptions = {
+  source?: "public" | "dashboard";
+  /** Owner-entered bookings skip the notice/advance-window rules. */
+  skipBookingRules?: boolean;
+};
+
+export async function createBooking(
+  input: BookingInput,
+  options: CreateBookingOptions = {},
+): Promise<Booking> {
+  const source = options.source ?? "public";
+  const clean = validateBookingInput(input, { phoneRequired: source === "public" });
+
+  if (!isD1Enabled()) {
+    return createDevBooking({
+      ...input,
+      customerName: clean.name,
+      customerPhone: clean.phone,
+      customerLanguage: clean.language,
+    });
+  }
+
+  const db = getD1()!;
+
+  const serviceRow = await d1First<ServiceRow>(
+    db
+      .prepare("SELECT * FROM services WHERE id = ? AND business_id = ? AND active = 1")
+      .bind(input.serviceId, input.businessId),
+  );
+  if (!serviceRow) throw new Error("This booking page is no longer available.");
+
+  const service = mapService(serviceRow);
+
+  // Check monthly limit
+  const bizRow = await d1First<BusinessRow>(
+    db.prepare("SELECT * FROM businesses WHERE id = ?").bind(input.businessId),
+  );
+  const business = bizRow ? mapBusiness(bizRow) : null;
+  if (business) {
+    // Enforce the owner's booking rules server-side.
+    if (!options.skipBookingRules) {
+      const startMsCheck = new Date(input.startAt).getTime();
+      const nowMs = Date.now();
+      if (startMsCheck - nowMs < business.minNoticeMinutes * 60_000) {
+        throw new Error(
+          "This time is too soon. The business needs more notice — pick a later slot.",
+        );
+      }
+      if (startMsCheck > nowMs + business.maxAdvanceDays * 24 * 3600 * 1000) {
+        throw new Error(
+          `Bookings can only be made up to ${business.maxAdvanceDays} days in advance.`,
+        );
+      }
+      if (business.noSameDay && mauritiusDateFromIso(input.startAt) === mauritiusTodayInput()) {
+        throw new Error("Same-day booking is not available. Please pick a later date.");
+      }
+      // Authoritative check: the posted start time must be a real, currently
+      // AVAILABLE generated slot — never trust the client's date/time choice.
+      const validSlot = await isValidAvailableSlot(db, business, service, input.startAt);
+      if (!validSlot) {
+        throw new Error("That time isn't available. Please pick another slot.");
+      }
+    }
+
+  }
+
+  // Compute the end time before the atomic final overlap guard below.
+  const startMs = new Date(input.startAt).getTime();
+  let endAt = new Date(startMs + service.durationMinutes * 60_000).toISOString();
+  if (service.allDay) {
+    // All-day bookings block the whole working day.
+    const bookingDate = mauritiusDateFromIso(input.startAt);
+    const dayRow = await d1First<AvailabilityRow>(
+      db
+        .prepare("SELECT * FROM availability WHERE business_id = ? AND day_of_week = ?")
+        .bind(input.businessId, getMauritiusDayOfWeek(bookingDate)),
+    );
+    if (dayRow?.closes_at) {
+      endAt = isoFromMauritiusLocal(bookingDate, dayRow.closes_at.slice(0, 5));
+    }
+  }
+
+  // Monthly-limit params folded into the atomic INSERT guard.
+  // skipLimitCheck = 1 short-circuits the subquery for non-free or unlimited plans.
+  const { start: monthStart, end: monthEnd } = mauritiusMonthBounds(input.startAt);
+  const skipLimitCheck = !business || business.plan !== "free" || !business.bookingLimitMonthly ? 1 : 0;
+  const limit = business?.bookingLimitMonthly ?? FREE_BOOKING_LIMIT;
+
+  const id = crypto.randomUUID();
+  let insertChanges = 0;
+  let insertOk = false;
+  let bookingRef = "";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    bookingRef = generateBookingRef();
+    try {
+      const r = await db
+        .prepare(
+          `
+          INSERT INTO bookings
+            (id, business_id, service_id, customer_name, customer_phone,
+             customer_language, start_at, end_at, status, source, booking_ref, notes)
+          SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?
+          WHERE NOT EXISTS (
+            SELECT 1 FROM bookings
+            WHERE business_id = ? AND status IN ('pending','confirmed')
+            AND start_at < ? AND end_at > ?
+          )
+          AND (
+            ?
+            OR (SELECT COUNT(*) FROM bookings
+                WHERE business_id = ? AND status IN ('pending','confirmed')
+                AND start_at >= ? AND start_at < ?) < ?
+          )
+        `,
+        )
+        .bind(
+          id,
+          input.businessId,
+          input.serviceId,
+          clean.name,
+          clean.phone,
+          clean.language,
+          input.startAt,
+          endAt,
+          source,
+          bookingRef,
+          input.notes ?? null,
+          input.businessId,
+          endAt,
+          input.startAt,
+          skipLimitCheck,
+          input.businessId,
+          monthStart,
+          monthEnd,
+          limit,
+        )
+        .run();
+      insertOk = r.success;
+      insertChanges = Number(r.meta?.changes ?? 0);
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/UNIQUE.*booking_ref/i.test(msg) && attempt < 4) continue;
+      throw err;
+    }
+  }
+
+  if (!insertOk) throw new Error("Something went wrong. Please try again.");
+  if (insertChanges < 1) {
+    // Distinguish overlap vs monthly-limit so the customer gets the right message.
+    const overlap = await d1First<{ id: string }>(
+      db
+        .prepare(
+          `SELECT id FROM bookings WHERE business_id = ? AND status IN ('pending','confirmed')
+           AND start_at < ? AND end_at > ? LIMIT 1`,
+        )
+        .bind(input.businessId, endAt, input.startAt),
+    );
+    if (overlap) throw new Error("That time has just been taken. Pick another slot.");
+    throw new Error("Online booking is full for this month.");
+  }
+
+  const booking: Booking = {
+    id,
+    businessId: input.businessId,
+    serviceId: input.serviceId,
+    serviceName: service.name,
+    servicePriceLabel: service.priceLabel,
+    businessName: business?.name,
+    businessSlug: business?.slug,
+    customerName: clean.name,
+    customerPhone: clean.phone,
+    customerLanguage: clean.language,
+    startAt: input.startAt,
+    endAt,
+    status: "pending",
+    source,
+    bookingRef,
+    notes: input.notes,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (business) {
+    const bookingContext = {
+      customerName: booking.customerName,
+      customerPhone: booking.customerPhone,
+      businessName: business.name,
+      serviceName: service.name,
+      priceLabel: service.priceLabel,
+      bookingRef,
+      dateLabel: formatDateLabel(input.startAt, { year: "numeric" }),
+      timeLabel: formatTimeLabel(input.startAt),
+      bookingUrl: `${siteUrlFromEnv()}/b/${business.slug}/confirmed?bookingId=${booking.id}`,
+      language: clean.language,
+    };
+
+    await Promise.allSettled([
+      // Customer confirmation needs a phone (owner-entered bookings may omit it).
+      booking.customerPhone
+        ? sendTemplatedBookingConfirmation({
+            businessId: business.id,
+            bookingId: booking.id,
+            to: booking.customerPhone,
+            booking: bookingContext,
+          })
+        : Promise.resolve(),
+      // No owner alert for bookings the owner entered themselves.
+      business.whatsappNumber && source === "public"
+        ? sendTemplatedOwnerBookingAlert({
+            businessId: business.id,
+            bookingId: booking.id,
+            to: business.whatsappNumber,
+            booking: {
+              ...bookingContext,
+              language: business.bookingPageLanguage,
+            },
+          })
+        : Promise.resolve(),
+    ]);
+  }
+
+  saveLastBooking(booking);
+  return booking;
+}
+
+/**
+ * Owner-entered booking from the dashboard (walk-in / phone booking).
+ * Verifies ownership; skips the notice/advance-window rules but still
+ * enforces overlap and the monthly plan limit.
+ */
+export async function createOwnerBooking(input: BookingInput, ownerId: string): Promise<Booking> {
+  if (isD1Enabled()) {
+    await ensureBusinessOwner(getD1()!, input.businessId, ownerId);
+  }
+  return createBooking(input, { source: "dashboard", skipBookingRules: true });
+}
+
+/** Ownership guard for routes outside this module. */
+export async function assertBusinessOwnership(businessId: string, ownerId: string): Promise<void> {
+  if (!isD1Enabled()) return;
+  await ensureBusinessOwner(getD1()!, businessId, ownerId);
+}
+
+export async function getBookingById(id: string): Promise<Booking | null> {
+  // Dev-store last-booking is always checked first (used by confirmation page)
+  const devBooking = await getDevBookingById(id);
+  if (devBooking) return devBooking;
+
+  if (!isD1Enabled()) return null;
+  const db = getD1()!;
+
+  const row = await d1First<BookingRow>(
+    db
+      .prepare(
+        `
+      SELECT b.*,
+        s.name as service_name, s.price_label as service_price_label,
+        biz.name as business_name, biz.slug as business_slug
+      FROM bookings b
+      LEFT JOIN services s ON s.id = b.service_id
+      LEFT JOIN businesses biz ON biz.id = b.business_id
+      WHERE b.id = ?
+    `,
+      )
+      .bind(id),
+  );
+  return row ? mapBooking(row) : null;
+}
+
+export async function getDashboardData(ownerOverride?: Owner | null): Promise<DashboardData> {
+  if (!isD1Enabled()) return getDevDashboardData();
+
+  const db = getD1()!;
+  const owner = await resolveOwner(ownerOverride);
+  if (!owner) {
+    return {
+      owner: null,
+      business: null,
+      services: [],
+      availability: [],
+      bookings: [],
+      usage: { plan: "free", used: 0, limit: FREE_BOOKING_LIMIT, nearLimit: false, full: false },
+    };
+  }
+
+  const business = await getBusinessForOwner(owner.id);
+  if (!business) {
+    return {
+      owner,
+      business: null,
+      services: [],
+      availability: [],
+      bookings: [],
+      usage: { plan: "free", used: 0, limit: FREE_BOOKING_LIMIT, nearLimit: false, full: false },
+    };
+  }
+
+  const [serviceRows, availRows, bookingRows] = await Promise.all([
+    d1All<ServiceRow>(
+      db
+        .prepare("SELECT * FROM services WHERE business_id = ? AND active = 1 ORDER BY created_at")
+        .bind(business.id),
+    ),
+    d1All<AvailabilityRow>(
+      db
+        .prepare("SELECT * FROM availability WHERE business_id = ? ORDER BY day_of_week")
+        .bind(business.id),
+    ),
+    d1All<BookingRow>(
+      db
+        .prepare(
+          `
+      SELECT b.*, s.name as service_name, s.price_label as service_price_label,
+        biz.name as business_name, biz.slug as business_slug
+      FROM bookings b
+      LEFT JOIN services s ON s.id = b.service_id
+      LEFT JOIN businesses biz ON biz.id = b.business_id
+      WHERE b.business_id = ? ORDER BY b.start_at
+    `,
+        )
+        .bind(business.id),
+    ),
+  ]);
+
+  const bookings = bookingRows.map(mapBooking);
+  return {
+    owner,
+    business,
+    services: serviceRows.map(mapService),
+    availability: availRows.map(mapAvailability),
+    bookings,
+    usage: calculateMonthlyUsage(bookings, business.plan, business.bookingLimitMonthly),
+  };
+}
+
+export async function cancelBooking(id: string, ownerId?: string): Promise<Booking> {
+  if (!isD1Enabled()) return cancelDevBooking(id);
+
+  const db = getD1()!;
+  const existing = await d1First<{ business_id: string }>(
+    db.prepare("SELECT business_id FROM bookings WHERE id = ?").bind(id),
+  );
+  if (!existing) throw new Error("Booking not found.");
+  await ensureBusinessOwner(db, existing.business_id, await requireOwnerId(ownerId));
+  await d1Run(
+    db
+      .prepare(
+        "UPDATE bookings SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?",
+      )
+      .bind(id),
+  );
+  const booking = (await getBookingById(id))!;
+
+  if (booking.customerPhone) {
+    await Promise.allSettled([
+      sendTemplatedCancellationMessage({
+        businessId: booking.businessId,
+        bookingId: booking.id,
+        to: booking.customerPhone,
+        booking: {
+          customerName: booking.customerName,
+          customerPhone: booking.customerPhone,
+          businessName: booking.businessName ?? "the business",
+          serviceName: booking.serviceName ?? "your service",
+          priceLabel: booking.servicePriceLabel,
+          dateLabel: formatDateLabel(booking.startAt, { year: "numeric" }),
+          timeLabel: formatTimeLabel(booking.startAt),
+          language: booking.customerLanguage,
+        },
+      }),
+    ]);
+  }
+
+  return booking;
+}
+
+export async function markBookingConfirmed(id: string, ownerId?: string): Promise<Booking> {
+  if (!isD1Enabled()) return confirmDevBooking(id);
+
+  const db = getD1()!;
+  const existing = await d1First<{ business_id: string }>(
+    db.prepare("SELECT business_id FROM bookings WHERE id = ?").bind(id),
+  );
+  if (!existing) throw new Error("Booking not found.");
+  await ensureBusinessOwner(db, existing.business_id, await requireOwnerId(ownerId));
+  await d1Run(
+    db
+      .prepare(
+        "UPDATE bookings SET status = 'confirmed', updated_at = datetime('now') WHERE id = ?",
+      )
+      .bind(id),
+  );
+  return (await getBookingById(id))!;
+}

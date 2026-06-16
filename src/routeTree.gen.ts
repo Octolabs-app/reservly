@@ -12,17 +12,52 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as HelpRouteImport } from './routes/help'
+import { Route as GuideRouteImport } from './routes/guide'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardSettingsRouteImport } from './routes/dashboard.settings'
 import { Route as DashboardBookingsRouteImport } from './routes/dashboard.bookings'
 import { Route as BSlugRouteImport } from './routes/b.$slug'
-import { Route as BSlugConfirmedRouteImport } from './routes/b.$slug.confirmed'
+import { Route as ApiAuthRouteImport } from './routes/api.auth'
+import { Route as BSlugConfirmedRouteImport } from './routes/b.$slug_.confirmed'
 import { Route as ApiTwilioInboundRouteImport } from './routes/api.twilio.inbound'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe.webhook'
 import { Route as ApiStripeCheckoutRouteImport } from './routes/api.stripe.checkout'
+import { Route as ApiPublicSlotsRouteImport } from './routes/api.public.slots'
+import { Route as ApiPublicBusinessRouteImport } from './routes/api.public.business'
+import { Route as ApiPublicBookingsRouteImport } from './routes/api.public.bookings'
+import { Route as ApiPublicBookingRouteImport } from './routes/api.public.booking'
+import { Route as ApiDashboardServiceRouteImport } from './routes/api.dashboard.service'
+import { Route as ApiDashboardDataRouteImport } from './routes/api.dashboard.data'
+import { Route as ApiDashboardCreateBookingRouteImport } from './routes/api.dashboard.create-booking'
+import { Route as ApiDashboardBusinessRouteImport } from './routes/api.dashboard.business'
+import { Route as ApiDashboardBookingActionRouteImport } from './routes/api.dashboard.booking-action'
+import { Route as ApiDashboardAvailabilityRouteImport } from './routes/api.dashboard.availability'
+import { Route as ApiBillingConfigRouteImport } from './routes/api.billing.config'
+import { Route as ApiAuthSignupRouteImport } from './routes/api.auth.signup'
+import { Route as ApiAuthSignoutRouteImport } from './routes/api.auth.signout'
+import { Route as ApiAuthSigninRouteImport } from './routes/api.auth.signin'
+import { Route as ApiAuthSetPasswordRouteImport } from './routes/api.auth.set-password'
+import { Route as ApiAuthMeRouteImport } from './routes/api.auth.me'
+import { Route as ApiAuthDeleteAccountRouteImport } from './routes/api.auth.delete-account'
+import { Route as ApiAdminSystemRouteImport } from './routes/api.admin.system'
+import { Route as ApiAdminOwnersRouteImport } from './routes/api.admin.owners'
+import { Route as ApiAdminOverviewRouteImport } from './routes/api.admin.overview'
+import { Route as ApiAdminMessagingRouteImport } from './routes/api.admin.messaging'
+import { Route as ApiAdminBusinessesRouteImport } from './routes/api.admin.businesses'
+import { Route as ApiAdminBookingsRouteImport } from './routes/api.admin.bookings'
+import { Route as ApiAdminAuditRouteImport } from './routes/api.admin.audit'
+import { Route as ApiMetaWaWebhookRouteImport } from './routes/api.meta.wa.webhook'
+import { Route as ApiAuthGoogleStartRouteImport } from './routes/api.auth.google.start'
+import { Route as ApiAuthGoogleDisconnectRouteImport } from './routes/api.auth.google.disconnect'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api.auth.google.callback'
+import { Route as ApiAuthFacebookStartRouteImport } from './routes/api.auth.facebook.start'
+import { Route as ApiAuthFacebookDisconnectRouteImport } from './routes/api.auth.facebook.disconnect'
+import { Route as ApiAuthFacebookCallbackRouteImport } from './routes/api.auth.facebook.callback'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -39,6 +74,16 @@ const OnboardingRoute = OnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideRoute = GuideRouteImport.update({
+  id: '/guide',
+  path: '/guide',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -47,6 +92,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -74,10 +124,15 @@ const BSlugRoute = BSlugRouteImport.update({
   path: '/b/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthRoute = ApiAuthRouteImport.update({
+  id: '/api/auth',
+  path: '/api/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BSlugConfirmedRoute = BSlugConfirmedRouteImport.update({
-  id: '/confirmed',
-  path: '/confirmed',
-  getParentRoute: () => BSlugRoute,
+  id: '/b/$slug_/confirmed',
+  path: '/b/$slug/confirmed',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTwilioInboundRoute = ApiTwilioInboundRouteImport.update({
   id: '/api/twilio/inbound',
@@ -94,116 +149,509 @@ const ApiStripeCheckoutRoute = ApiStripeCheckoutRouteImport.update({
   path: '/api/stripe/checkout',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicSlotsRoute = ApiPublicSlotsRouteImport.update({
+  id: '/api/public/slots',
+  path: '/api/public/slots',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBusinessRoute = ApiPublicBusinessRouteImport.update({
+  id: '/api/public/business',
+  path: '/api/public/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBookingsRoute = ApiPublicBookingsRouteImport.update({
+  id: '/api/public/bookings',
+  path: '/api/public/bookings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicBookingRoute = ApiPublicBookingRouteImport.update({
+  id: '/api/public/booking',
+  path: '/api/public/booking',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardServiceRoute = ApiDashboardServiceRouteImport.update({
+  id: '/api/dashboard/service',
+  path: '/api/dashboard/service',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardDataRoute = ApiDashboardDataRouteImport.update({
+  id: '/api/dashboard/data',
+  path: '/api/dashboard/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardCreateBookingRoute =
+  ApiDashboardCreateBookingRouteImport.update({
+    id: '/api/dashboard/create-booking',
+    path: '/api/dashboard/create-booking',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiDashboardBusinessRoute = ApiDashboardBusinessRouteImport.update({
+  id: '/api/dashboard/business',
+  path: '/api/dashboard/business',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardBookingActionRoute =
+  ApiDashboardBookingActionRouteImport.update({
+    id: '/api/dashboard/booking-action',
+    path: '/api/dashboard/booking-action',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiDashboardAvailabilityRoute =
+  ApiDashboardAvailabilityRouteImport.update({
+    id: '/api/dashboard/availability',
+    path: '/api/dashboard/availability',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingConfigRoute = ApiBillingConfigRouteImport.update({
+  id: '/api/billing/config',
+  path: '/api/billing/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSignupRoute = ApiAuthSignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthSignoutRoute = ApiAuthSignoutRouteImport.update({
+  id: '/signout',
+  path: '/signout',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthSigninRoute = ApiAuthSigninRouteImport.update({
+  id: '/signin',
+  path: '/signin',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthSetPasswordRoute = ApiAuthSetPasswordRouteImport.update({
+  id: '/set-password',
+  path: '/set-password',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthMeRoute = ApiAuthMeRouteImport.update({
+  id: '/me',
+  path: '/me',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthDeleteAccountRoute = ApiAuthDeleteAccountRouteImport.update({
+  id: '/delete-account',
+  path: '/delete-account',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAdminSystemRoute = ApiAdminSystemRouteImport.update({
+  id: '/api/admin/system',
+  path: '/api/admin/system',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminOwnersRoute = ApiAdminOwnersRouteImport.update({
+  id: '/api/admin/owners',
+  path: '/api/admin/owners',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminOverviewRoute = ApiAdminOverviewRouteImport.update({
+  id: '/api/admin/overview',
+  path: '/api/admin/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminMessagingRoute = ApiAdminMessagingRouteImport.update({
+  id: '/api/admin/messaging',
+  path: '/api/admin/messaging',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminBusinessesRoute = ApiAdminBusinessesRouteImport.update({
+  id: '/api/admin/businesses',
+  path: '/api/admin/businesses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminBookingsRoute = ApiAdminBookingsRouteImport.update({
+  id: '/api/admin/bookings',
+  path: '/api/admin/bookings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminAuditRoute = ApiAdminAuditRouteImport.update({
+  id: '/api/admin/audit',
+  path: '/api/admin/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaWaWebhookRoute = ApiMetaWaWebhookRouteImport.update({
+  id: '/api/meta/wa/webhook',
+  path: '/api/meta/wa/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthGoogleStartRoute = ApiAuthGoogleStartRouteImport.update({
+  id: '/google/start',
+  path: '/google/start',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthGoogleDisconnectRoute = ApiAuthGoogleDisconnectRouteImport.update({
+  id: '/google/disconnect',
+  path: '/google/disconnect',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/google/callback',
+  path: '/google/callback',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthFacebookStartRoute = ApiAuthFacebookStartRouteImport.update({
+  id: '/facebook/start',
+  path: '/facebook/start',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
+const ApiAuthFacebookDisconnectRoute =
+  ApiAuthFacebookDisconnectRouteImport.update({
+    id: '/facebook/disconnect',
+    path: '/facebook/disconnect',
+    getParentRoute: () => ApiAuthRoute,
+  } as any)
+const ApiAuthFacebookCallbackRoute = ApiAuthFacebookCallbackRouteImport.update({
+  id: '/facebook/callback',
+  path: '/facebook/callback',
+  getParentRoute: () => ApiAuthRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/guide': typeof GuideRoute
+  '/help': typeof HelpRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/b/$slug': typeof BSlugRouteWithChildren
+  '/api/auth': typeof ApiAuthRouteWithChildren
+  '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/admin/audit': typeof ApiAdminAuditRoute
+  '/api/admin/bookings': typeof ApiAdminBookingsRoute
+  '/api/admin/businesses': typeof ApiAdminBusinessesRoute
+  '/api/admin/messaging': typeof ApiAdminMessagingRoute
+  '/api/admin/overview': typeof ApiAdminOverviewRoute
+  '/api/admin/owners': typeof ApiAdminOwnersRoute
+  '/api/admin/system': typeof ApiAdminSystemRoute
+  '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/set-password': typeof ApiAuthSetPasswordRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/billing/config': typeof ApiBillingConfigRoute
+  '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
+  '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
+  '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/create-booking': typeof ApiDashboardCreateBookingRoute
+  '/api/dashboard/data': typeof ApiDashboardDataRoute
+  '/api/dashboard/service': typeof ApiDashboardServiceRoute
+  '/api/public/booking': typeof ApiPublicBookingRoute
+  '/api/public/bookings': typeof ApiPublicBookingsRoute
+  '/api/public/business': typeof ApiPublicBusinessRoute
+  '/api/public/slots': typeof ApiPublicSlotsRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
   '/b/$slug/confirmed': typeof BSlugConfirmedRoute
+  '/api/auth/facebook/callback': typeof ApiAuthFacebookCallbackRoute
+  '/api/auth/facebook/disconnect': typeof ApiAuthFacebookDisconnectRoute
+  '/api/auth/facebook/start': typeof ApiAuthFacebookStartRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/disconnect': typeof ApiAuthGoogleDisconnectRoute
+  '/api/auth/google/start': typeof ApiAuthGoogleStartRoute
+  '/api/meta/wa/webhook': typeof ApiMetaWaWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/guide': typeof GuideRoute
+  '/help': typeof HelpRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/b/$slug': typeof BSlugRouteWithChildren
+  '/api/auth': typeof ApiAuthRouteWithChildren
+  '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard': typeof DashboardIndexRoute
+  '/api/admin/audit': typeof ApiAdminAuditRoute
+  '/api/admin/bookings': typeof ApiAdminBookingsRoute
+  '/api/admin/businesses': typeof ApiAdminBusinessesRoute
+  '/api/admin/messaging': typeof ApiAdminMessagingRoute
+  '/api/admin/overview': typeof ApiAdminOverviewRoute
+  '/api/admin/owners': typeof ApiAdminOwnersRoute
+  '/api/admin/system': typeof ApiAdminSystemRoute
+  '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/set-password': typeof ApiAuthSetPasswordRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/billing/config': typeof ApiBillingConfigRoute
+  '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
+  '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
+  '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/create-booking': typeof ApiDashboardCreateBookingRoute
+  '/api/dashboard/data': typeof ApiDashboardDataRoute
+  '/api/dashboard/service': typeof ApiDashboardServiceRoute
+  '/api/public/booking': typeof ApiPublicBookingRoute
+  '/api/public/bookings': typeof ApiPublicBookingsRoute
+  '/api/public/business': typeof ApiPublicBusinessRoute
+  '/api/public/slots': typeof ApiPublicSlotsRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
   '/b/$slug/confirmed': typeof BSlugConfirmedRoute
+  '/api/auth/facebook/callback': typeof ApiAuthFacebookCallbackRoute
+  '/api/auth/facebook/disconnect': typeof ApiAuthFacebookDisconnectRoute
+  '/api/auth/facebook/start': typeof ApiAuthFacebookStartRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/disconnect': typeof ApiAuthGoogleDisconnectRoute
+  '/api/auth/google/start': typeof ApiAuthGoogleStartRoute
+  '/api/meta/wa/webhook': typeof ApiMetaWaWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/guide': typeof GuideRoute
+  '/help': typeof HelpRoute
   '/onboarding': typeof OnboardingRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
-  '/b/$slug': typeof BSlugRouteWithChildren
+  '/api/auth': typeof ApiAuthRouteWithChildren
+  '/b/$slug': typeof BSlugRoute
   '/dashboard/bookings': typeof DashboardBookingsRoute
   '/dashboard/settings': typeof DashboardSettingsRoute
   '/dashboard/': typeof DashboardIndexRoute
+  '/api/admin/audit': typeof ApiAdminAuditRoute
+  '/api/admin/bookings': typeof ApiAdminBookingsRoute
+  '/api/admin/businesses': typeof ApiAdminBusinessesRoute
+  '/api/admin/messaging': typeof ApiAdminMessagingRoute
+  '/api/admin/overview': typeof ApiAdminOverviewRoute
+  '/api/admin/owners': typeof ApiAdminOwnersRoute
+  '/api/admin/system': typeof ApiAdminSystemRoute
+  '/api/auth/delete-account': typeof ApiAuthDeleteAccountRoute
+  '/api/auth/me': typeof ApiAuthMeRoute
+  '/api/auth/set-password': typeof ApiAuthSetPasswordRoute
+  '/api/auth/signin': typeof ApiAuthSigninRoute
+  '/api/auth/signout': typeof ApiAuthSignoutRoute
+  '/api/auth/signup': typeof ApiAuthSignupRoute
+  '/api/billing/config': typeof ApiBillingConfigRoute
+  '/api/dashboard/availability': typeof ApiDashboardAvailabilityRoute
+  '/api/dashboard/booking-action': typeof ApiDashboardBookingActionRoute
+  '/api/dashboard/business': typeof ApiDashboardBusinessRoute
+  '/api/dashboard/create-booking': typeof ApiDashboardCreateBookingRoute
+  '/api/dashboard/data': typeof ApiDashboardDataRoute
+  '/api/dashboard/service': typeof ApiDashboardServiceRoute
+  '/api/public/booking': typeof ApiPublicBookingRoute
+  '/api/public/bookings': typeof ApiPublicBookingsRoute
+  '/api/public/business': typeof ApiPublicBusinessRoute
+  '/api/public/slots': typeof ApiPublicSlotsRoute
   '/api/stripe/checkout': typeof ApiStripeCheckoutRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/api/twilio/inbound': typeof ApiTwilioInboundRoute
-  '/b/$slug/confirmed': typeof BSlugConfirmedRoute
+  '/b/$slug_/confirmed': typeof BSlugConfirmedRoute
+  '/api/auth/facebook/callback': typeof ApiAuthFacebookCallbackRoute
+  '/api/auth/facebook/disconnect': typeof ApiAuthFacebookDisconnectRoute
+  '/api/auth/facebook/start': typeof ApiAuthFacebookStartRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/disconnect': typeof ApiAuthGoogleDisconnectRoute
+  '/api/auth/google/start': typeof ApiAuthGoogleStartRoute
+  '/api/meta/wa/webhook': typeof ApiMetaWaWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
     | '/dashboard'
+    | '/guide'
+    | '/help'
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/api/auth'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/admin/audit'
+    | '/api/admin/bookings'
+    | '/api/admin/businesses'
+    | '/api/admin/messaging'
+    | '/api/admin/overview'
+    | '/api/admin/owners'
+    | '/api/admin/system'
+    | '/api/auth/delete-account'
+    | '/api/auth/me'
+    | '/api/auth/set-password'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
+    | '/api/auth/signup'
+    | '/api/billing/config'
+    | '/api/dashboard/availability'
+    | '/api/dashboard/booking-action'
+    | '/api/dashboard/business'
+    | '/api/dashboard/create-booking'
+    | '/api/dashboard/data'
+    | '/api/dashboard/service'
+    | '/api/public/booking'
+    | '/api/public/bookings'
+    | '/api/public/business'
+    | '/api/public/slots'
     | '/api/stripe/checkout'
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
     | '/b/$slug/confirmed'
+    | '/api/auth/facebook/callback'
+    | '/api/auth/facebook/disconnect'
+    | '/api/auth/facebook/start'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/disconnect'
+    | '/api/auth/google/start'
+    | '/api/meta/wa/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
+    | '/guide'
+    | '/help'
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/api/auth'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard'
+    | '/api/admin/audit'
+    | '/api/admin/bookings'
+    | '/api/admin/businesses'
+    | '/api/admin/messaging'
+    | '/api/admin/overview'
+    | '/api/admin/owners'
+    | '/api/admin/system'
+    | '/api/auth/delete-account'
+    | '/api/auth/me'
+    | '/api/auth/set-password'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
+    | '/api/auth/signup'
+    | '/api/billing/config'
+    | '/api/dashboard/availability'
+    | '/api/dashboard/booking-action'
+    | '/api/dashboard/business'
+    | '/api/dashboard/create-booking'
+    | '/api/dashboard/data'
+    | '/api/dashboard/service'
+    | '/api/public/booking'
+    | '/api/public/bookings'
+    | '/api/public/business'
+    | '/api/public/slots'
     | '/api/stripe/checkout'
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
     | '/b/$slug/confirmed'
+    | '/api/auth/facebook/callback'
+    | '/api/auth/facebook/disconnect'
+    | '/api/auth/facebook/start'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/disconnect'
+    | '/api/auth/google/start'
+    | '/api/meta/wa/webhook'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
     | '/dashboard'
+    | '/guide'
+    | '/help'
     | '/onboarding'
     | '/privacy'
     | '/terms'
+    | '/api/auth'
     | '/b/$slug'
     | '/dashboard/bookings'
     | '/dashboard/settings'
     | '/dashboard/'
+    | '/api/admin/audit'
+    | '/api/admin/bookings'
+    | '/api/admin/businesses'
+    | '/api/admin/messaging'
+    | '/api/admin/overview'
+    | '/api/admin/owners'
+    | '/api/admin/system'
+    | '/api/auth/delete-account'
+    | '/api/auth/me'
+    | '/api/auth/set-password'
+    | '/api/auth/signin'
+    | '/api/auth/signout'
+    | '/api/auth/signup'
+    | '/api/billing/config'
+    | '/api/dashboard/availability'
+    | '/api/dashboard/booking-action'
+    | '/api/dashboard/business'
+    | '/api/dashboard/create-booking'
+    | '/api/dashboard/data'
+    | '/api/dashboard/service'
+    | '/api/public/booking'
+    | '/api/public/bookings'
+    | '/api/public/business'
+    | '/api/public/slots'
     | '/api/stripe/checkout'
     | '/api/stripe/webhook'
     | '/api/twilio/inbound'
-    | '/b/$slug/confirmed'
+    | '/b/$slug_/confirmed'
+    | '/api/auth/facebook/callback'
+    | '/api/auth/facebook/disconnect'
+    | '/api/auth/facebook/start'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/disconnect'
+    | '/api/auth/google/start'
+    | '/api/meta/wa/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  GuideRoute: typeof GuideRoute
+  HelpRoute: typeof HelpRoute
   OnboardingRoute: typeof OnboardingRoute
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
-  BSlugRoute: typeof BSlugRouteWithChildren
+  ApiAuthRoute: typeof ApiAuthRouteWithChildren
+  BSlugRoute: typeof BSlugRoute
+  ApiAdminAuditRoute: typeof ApiAdminAuditRoute
+  ApiAdminBookingsRoute: typeof ApiAdminBookingsRoute
+  ApiAdminBusinessesRoute: typeof ApiAdminBusinessesRoute
+  ApiAdminMessagingRoute: typeof ApiAdminMessagingRoute
+  ApiAdminOverviewRoute: typeof ApiAdminOverviewRoute
+  ApiAdminOwnersRoute: typeof ApiAdminOwnersRoute
+  ApiAdminSystemRoute: typeof ApiAdminSystemRoute
+  ApiBillingConfigRoute: typeof ApiBillingConfigRoute
+  ApiDashboardAvailabilityRoute: typeof ApiDashboardAvailabilityRoute
+  ApiDashboardBookingActionRoute: typeof ApiDashboardBookingActionRoute
+  ApiDashboardBusinessRoute: typeof ApiDashboardBusinessRoute
+  ApiDashboardCreateBookingRoute: typeof ApiDashboardCreateBookingRoute
+  ApiDashboardDataRoute: typeof ApiDashboardDataRoute
+  ApiDashboardServiceRoute: typeof ApiDashboardServiceRoute
+  ApiPublicBookingRoute: typeof ApiPublicBookingRoute
+  ApiPublicBookingsRoute: typeof ApiPublicBookingsRoute
+  ApiPublicBusinessRoute: typeof ApiPublicBusinessRoute
+  ApiPublicSlotsRoute: typeof ApiPublicSlotsRoute
   ApiStripeCheckoutRoute: typeof ApiStripeCheckoutRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTwilioInboundRoute: typeof ApiTwilioInboundRoute
+  BSlugConfirmedRoute: typeof BSlugConfirmedRoute
+  ApiMetaWaWebhookRoute: typeof ApiMetaWaWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -229,6 +677,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide': {
+      id: '/guide'
+      path: '/guide'
+      fullPath: '/guide'
+      preLoaderRoute: typeof GuideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -241,6 +703,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -278,12 +747,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/b/$slug/confirmed': {
-      id: '/b/$slug/confirmed'
-      path: '/confirmed'
+    '/api/auth': {
+      id: '/api/auth'
+      path: '/api/auth'
+      fullPath: '/api/auth'
+      preLoaderRoute: typeof ApiAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/b/$slug_/confirmed': {
+      id: '/b/$slug_/confirmed'
+      path: '/b/$slug/confirmed'
       fullPath: '/b/$slug/confirmed'
       preLoaderRoute: typeof BSlugConfirmedRouteImport
-      parentRoute: typeof BSlugRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/twilio/inbound': {
       id: '/api/twilio/inbound'
@@ -306,6 +782,223 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeCheckoutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/slots': {
+      id: '/api/public/slots'
+      path: '/api/public/slots'
+      fullPath: '/api/public/slots'
+      preLoaderRoute: typeof ApiPublicSlotsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/business': {
+      id: '/api/public/business'
+      path: '/api/public/business'
+      fullPath: '/api/public/business'
+      preLoaderRoute: typeof ApiPublicBusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/bookings': {
+      id: '/api/public/bookings'
+      path: '/api/public/bookings'
+      fullPath: '/api/public/bookings'
+      preLoaderRoute: typeof ApiPublicBookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/booking': {
+      id: '/api/public/booking'
+      path: '/api/public/booking'
+      fullPath: '/api/public/booking'
+      preLoaderRoute: typeof ApiPublicBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/service': {
+      id: '/api/dashboard/service'
+      path: '/api/dashboard/service'
+      fullPath: '/api/dashboard/service'
+      preLoaderRoute: typeof ApiDashboardServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/data': {
+      id: '/api/dashboard/data'
+      path: '/api/dashboard/data'
+      fullPath: '/api/dashboard/data'
+      preLoaderRoute: typeof ApiDashboardDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/create-booking': {
+      id: '/api/dashboard/create-booking'
+      path: '/api/dashboard/create-booking'
+      fullPath: '/api/dashboard/create-booking'
+      preLoaderRoute: typeof ApiDashboardCreateBookingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/business': {
+      id: '/api/dashboard/business'
+      path: '/api/dashboard/business'
+      fullPath: '/api/dashboard/business'
+      preLoaderRoute: typeof ApiDashboardBusinessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/booking-action': {
+      id: '/api/dashboard/booking-action'
+      path: '/api/dashboard/booking-action'
+      fullPath: '/api/dashboard/booking-action'
+      preLoaderRoute: typeof ApiDashboardBookingActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/availability': {
+      id: '/api/dashboard/availability'
+      path: '/api/dashboard/availability'
+      fullPath: '/api/dashboard/availability'
+      preLoaderRoute: typeof ApiDashboardAvailabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/config': {
+      id: '/api/billing/config'
+      path: '/api/billing/config'
+      fullPath: '/api/billing/config'
+      preLoaderRoute: typeof ApiBillingConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/signup': {
+      id: '/api/auth/signup'
+      path: '/signup'
+      fullPath: '/api/auth/signup'
+      preLoaderRoute: typeof ApiAuthSignupRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/signout': {
+      id: '/api/auth/signout'
+      path: '/signout'
+      fullPath: '/api/auth/signout'
+      preLoaderRoute: typeof ApiAuthSignoutRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/signin': {
+      id: '/api/auth/signin'
+      path: '/signin'
+      fullPath: '/api/auth/signin'
+      preLoaderRoute: typeof ApiAuthSigninRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/set-password': {
+      id: '/api/auth/set-password'
+      path: '/set-password'
+      fullPath: '/api/auth/set-password'
+      preLoaderRoute: typeof ApiAuthSetPasswordRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/me': {
+      id: '/api/auth/me'
+      path: '/me'
+      fullPath: '/api/auth/me'
+      preLoaderRoute: typeof ApiAuthMeRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/delete-account': {
+      id: '/api/auth/delete-account'
+      path: '/delete-account'
+      fullPath: '/api/auth/delete-account'
+      preLoaderRoute: typeof ApiAuthDeleteAccountRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/admin/system': {
+      id: '/api/admin/system'
+      path: '/api/admin/system'
+      fullPath: '/api/admin/system'
+      preLoaderRoute: typeof ApiAdminSystemRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/owners': {
+      id: '/api/admin/owners'
+      path: '/api/admin/owners'
+      fullPath: '/api/admin/owners'
+      preLoaderRoute: typeof ApiAdminOwnersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/overview': {
+      id: '/api/admin/overview'
+      path: '/api/admin/overview'
+      fullPath: '/api/admin/overview'
+      preLoaderRoute: typeof ApiAdminOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/messaging': {
+      id: '/api/admin/messaging'
+      path: '/api/admin/messaging'
+      fullPath: '/api/admin/messaging'
+      preLoaderRoute: typeof ApiAdminMessagingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/businesses': {
+      id: '/api/admin/businesses'
+      path: '/api/admin/businesses'
+      fullPath: '/api/admin/businesses'
+      preLoaderRoute: typeof ApiAdminBusinessesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/bookings': {
+      id: '/api/admin/bookings'
+      path: '/api/admin/bookings'
+      fullPath: '/api/admin/bookings'
+      preLoaderRoute: typeof ApiAdminBookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/audit': {
+      id: '/api/admin/audit'
+      path: '/api/admin/audit'
+      fullPath: '/api/admin/audit'
+      preLoaderRoute: typeof ApiAdminAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta/wa/webhook': {
+      id: '/api/meta/wa/webhook'
+      path: '/api/meta/wa/webhook'
+      fullPath: '/api/meta/wa/webhook'
+      preLoaderRoute: typeof ApiMetaWaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/google/start': {
+      id: '/api/auth/google/start'
+      path: '/google/start'
+      fullPath: '/api/auth/google/start'
+      preLoaderRoute: typeof ApiAuthGoogleStartRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/google/disconnect': {
+      id: '/api/auth/google/disconnect'
+      path: '/google/disconnect'
+      fullPath: '/api/auth/google/disconnect'
+      preLoaderRoute: typeof ApiAuthGoogleDisconnectRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/google/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/facebook/start': {
+      id: '/api/auth/facebook/start'
+      path: '/facebook/start'
+      fullPath: '/api/auth/facebook/start'
+      preLoaderRoute: typeof ApiAuthFacebookStartRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/facebook/disconnect': {
+      id: '/api/auth/facebook/disconnect'
+      path: '/facebook/disconnect'
+      fullPath: '/api/auth/facebook/disconnect'
+      preLoaderRoute: typeof ApiAuthFacebookDisconnectRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
+    '/api/auth/facebook/callback': {
+      id: '/api/auth/facebook/callback'
+      path: '/facebook/callback'
+      fullPath: '/api/auth/facebook/callback'
+      preLoaderRoute: typeof ApiAuthFacebookCallbackRouteImport
+      parentRoute: typeof ApiAuthRoute
+    }
   }
 }
 
@@ -325,27 +1018,74 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
   DashboardRouteChildren,
 )
 
-interface BSlugRouteChildren {
-  BSlugConfirmedRoute: typeof BSlugConfirmedRoute
+interface ApiAuthRouteChildren {
+  ApiAuthDeleteAccountRoute: typeof ApiAuthDeleteAccountRoute
+  ApiAuthMeRoute: typeof ApiAuthMeRoute
+  ApiAuthSetPasswordRoute: typeof ApiAuthSetPasswordRoute
+  ApiAuthSigninRoute: typeof ApiAuthSigninRoute
+  ApiAuthSignoutRoute: typeof ApiAuthSignoutRoute
+  ApiAuthSignupRoute: typeof ApiAuthSignupRoute
+  ApiAuthFacebookCallbackRoute: typeof ApiAuthFacebookCallbackRoute
+  ApiAuthFacebookDisconnectRoute: typeof ApiAuthFacebookDisconnectRoute
+  ApiAuthFacebookStartRoute: typeof ApiAuthFacebookStartRoute
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
+  ApiAuthGoogleDisconnectRoute: typeof ApiAuthGoogleDisconnectRoute
+  ApiAuthGoogleStartRoute: typeof ApiAuthGoogleStartRoute
 }
 
-const BSlugRouteChildren: BSlugRouteChildren = {
-  BSlugConfirmedRoute: BSlugConfirmedRoute,
+const ApiAuthRouteChildren: ApiAuthRouteChildren = {
+  ApiAuthDeleteAccountRoute: ApiAuthDeleteAccountRoute,
+  ApiAuthMeRoute: ApiAuthMeRoute,
+  ApiAuthSetPasswordRoute: ApiAuthSetPasswordRoute,
+  ApiAuthSigninRoute: ApiAuthSigninRoute,
+  ApiAuthSignoutRoute: ApiAuthSignoutRoute,
+  ApiAuthSignupRoute: ApiAuthSignupRoute,
+  ApiAuthFacebookCallbackRoute: ApiAuthFacebookCallbackRoute,
+  ApiAuthFacebookDisconnectRoute: ApiAuthFacebookDisconnectRoute,
+  ApiAuthFacebookStartRoute: ApiAuthFacebookStartRoute,
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
+  ApiAuthGoogleDisconnectRoute: ApiAuthGoogleDisconnectRoute,
+  ApiAuthGoogleStartRoute: ApiAuthGoogleStartRoute,
 }
 
-const BSlugRouteWithChildren = BSlugRoute._addFileChildren(BSlugRouteChildren)
+const ApiAuthRouteWithChildren =
+  ApiAuthRoute._addFileChildren(ApiAuthRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  GuideRoute: GuideRoute,
+  HelpRoute: HelpRoute,
   OnboardingRoute: OnboardingRoute,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
-  BSlugRoute: BSlugRouteWithChildren,
+  ApiAuthRoute: ApiAuthRouteWithChildren,
+  BSlugRoute: BSlugRoute,
+  ApiAdminAuditRoute: ApiAdminAuditRoute,
+  ApiAdminBookingsRoute: ApiAdminBookingsRoute,
+  ApiAdminBusinessesRoute: ApiAdminBusinessesRoute,
+  ApiAdminMessagingRoute: ApiAdminMessagingRoute,
+  ApiAdminOverviewRoute: ApiAdminOverviewRoute,
+  ApiAdminOwnersRoute: ApiAdminOwnersRoute,
+  ApiAdminSystemRoute: ApiAdminSystemRoute,
+  ApiBillingConfigRoute: ApiBillingConfigRoute,
+  ApiDashboardAvailabilityRoute: ApiDashboardAvailabilityRoute,
+  ApiDashboardBookingActionRoute: ApiDashboardBookingActionRoute,
+  ApiDashboardBusinessRoute: ApiDashboardBusinessRoute,
+  ApiDashboardCreateBookingRoute: ApiDashboardCreateBookingRoute,
+  ApiDashboardDataRoute: ApiDashboardDataRoute,
+  ApiDashboardServiceRoute: ApiDashboardServiceRoute,
+  ApiPublicBookingRoute: ApiPublicBookingRoute,
+  ApiPublicBookingsRoute: ApiPublicBookingsRoute,
+  ApiPublicBusinessRoute: ApiPublicBusinessRoute,
+  ApiPublicSlotsRoute: ApiPublicSlotsRoute,
   ApiStripeCheckoutRoute: ApiStripeCheckoutRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTwilioInboundRoute: ApiTwilioInboundRoute,
+  BSlugConfirmedRoute: BSlugConfirmedRoute,
+  ApiMetaWaWebhookRoute: ApiMetaWaWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

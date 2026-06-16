@@ -16,7 +16,7 @@ POST {SITE_URL}/api/twilio/inbound
 
 ## Reply Parsing
 
-Reservly handles:
+Randevou handles:
 
 - `CONFIRM`, `CONFIRMED`, `YES`, `OUI` -> confirm booking
 - `CANCEL`, `CANCELLED`, `NON` -> cancel booking
@@ -25,4 +25,4 @@ The handler matches by recent booking phone number. If more than one recent book
 
 ## Development Behavior
 
-If Twilio env vars are missing, outbound messages are logged to `message_events` when Supabase admin env vars exist, or to the server console otherwise.
+If Twilio env vars are missing, outbound messages are logged to the D1 `message_events` table (or the server console in local dev) instead of being sent.

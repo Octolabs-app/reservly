@@ -1,21 +1,12 @@
+// This endpoint has been replaced by /api/meta/wa/webhook (Meta Cloud API).
+// Kept as a 410 Gone stub so the route tree doesn't drift.
 import { createFileRoute } from "@tanstack/react-router";
-import { handleInboundWhatsAppReply } from "@/lib/reservly/messaging.server";
 
 export const Route = createFileRoute("/api/twilio/inbound")({
   component: Empty,
   server: {
     handlers: {
-      POST: async ({ request }) => {
-        const form = await request.formData();
-        const from = String(form.get("From") ?? "");
-        const body = String(form.get("Body") ?? "");
-        const result = await handleInboundWhatsAppReply({
-          from,
-          body,
-          rawPayload: Object.fromEntries(form.entries()),
-        });
-        return Response.json(result);
-      },
+      POST: async () => new Response("Gone", { status: 410 }),
     },
   },
 });
